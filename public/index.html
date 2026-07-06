@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AB2S Sécurité — Base de données Clients</title>
+<link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <img src="assets/logo.png" alt="AB2S Sécurité" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='flex'">
+    <div id="logo-fallback" class="logo-fallback" style="display:none">
+      <span class="logo-fb-title">AB2S</span>
+      <span class="logo-fb-sub">SÉCURITÉ</span>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <a class="nav-item active" data-tab="dashboard" onclick="showTab('dashboard')">
+      <span class="nav-icon">📊</span><span>Tableau de bord</span>
+    </a>
+    <a class="nav-item" data-tab="clients" onclick="showTab('clients')">
+      <span class="nav-icon">🏢</span><span>Clients</span>
+    </a>
+    <a class="nav-item" data-tab="agents" onclick="showTab('agents')">
+      <span class="nav-icon">👤</span><span>Agents</span>
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="sidebar-version" id="connected-as">Connecté</div>
+    <button class="btn-export" onclick="logout()">🚪 Déconnexion</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+
+  <!-- ═══════════════════ DASHBOARD ═══════════════════ -->
+  <section id="tab-dashboard" class="tab-section active">
+    <div class="page-header">
+      <div><h1>Tableau de bord</h1></div>
+      <button class="btn-primary" onclick="openClientModal()">+ Nouveau client</button>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card blue">
+        <div class="kpi-label">Clients actifs</div>
+        <div class="kpi-value" id="k-clients">—</div>
+        <div class="kpi-icon">🏢</div>
+      </div>
+      <div class="kpi-card orange">
+        <div class="kpi-label">Sites surveillés</div>
+        <div class="kpi-value" id="k-sites">—</div>
+        <div class="kpi-icon">📍</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">Agents</div>
+        <div class="kpi-value" id="k-agents">—</div>
+        <div class="kpi-icon">👤</div>
+      </div>
+      <div class="kpi-card teal">
+        <div class="kpi-label">Documents</div>
+        <div class="kpi-value" id="k-documents">—</div>
+        <div class="kpi-icon">📄</div>
+      </div>
+      <div class="kpi-card red">
+        <div class="kpi-label">Échéances (30j)</div>
+        <div class="kpi-value" id="k-echeances">—</div>
+        <div class="kpi-icon">⏰</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CLIENTS ═══════════════════ -->
+  <section id="tab-clients" class="tab-section">
+    <div class="page-header">
+      <div>
+        <h1>Clients</h1>
+        <p class="page-sub" id="clients-count">Chargement…</p>
+      </div>
+      <button class="btn-primary" onclick="openClientModal()">+ Nouveau client</button>
+    </div>
+    <div class="filters-bar card">
+      <input type="search" id="search-input" placeholder="🔍 Rechercher (société, contact, ville…)" oninput="loadClients()" class="search-input">
+    </div>
+    <div class="card mt12">
+      <table class="table" id="clients-table">
+        <thead><tr>
+          <th>Société</th><th>Contact</th><th>Ville</th>
+          <th>Type de prestation</th><th>Statut</th><th>Fin de contrat</th>
+        </tr></thead>
+        <tbody id="clients-body"></tbody>
+      </table>
+      <div id="clients-empty" class="empty-state" style="display:none">
+        <div class="empty-icon">🏢</div>
+        <p>Aucun client trouvé</p>
+        <button class="btn-primary mt8" onclick="openClientModal()">Ajouter le premier client</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ AGENTS ═══════════════════ -->
+  <section id="tab-agents" class="tab-section">
+    <div class="page-header"><h1>Agents</h1></div>
+    <div class="card">
+      <div class="activite-add">
+        <input type="text" id="new-agent-nom" placeholder="Nom de l'agent…" class="search-input">
+        <button class="btn-primary" onclick="addAgent()">Ajouter</button>
+      </div>
+      <div id="agents-list" class="mt12"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════════
+     MODAL FICHE CLIENT
+═══════════════════════════════════════════════════════ -->
+<div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
+  <div class="modal" id="modal-client">
+    <div class="modal-header">
+      <h2 id="modal-title">Nouveau client</h2>
+      <button class="modal-close" onclick="closeClientModal()">✕</button>
+    </div>
+
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchModalTab('infos',this)">📋 Informations</button>
+      <button class="modal-tab" onclick="switchModalTab('sites',this)">📍 Sites & Agents</button>
+      <button class="modal-tab" onclick="switchModalTab('documents',this)">📄 Documents</button>
+      <button class="modal-tab" onclick="switchModalTab('historique',this)">📝 Historique</button>
+    </div>
+
+    <!-- Tab Infos -->
+    <div id="mtab-infos" class="modal-tab-content active">
+      <form id="client-form">
+        <input type="hidden" id="f-id">
+
+        <div class="form-section-title">Entreprise</div>
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>Société *</label>
+            <input type="text" id="f-societe" required placeholder="Nom de l'entreprise">
+          </div>
+          <div class="form-group flex-1">
+            <label>Type de prestation</label>
+            <select id="f-type-prestation">
+              <option>Gardiennage</option><option>Surveillance événementielle</option>
+              <option>Rondes</option><option>Télésurveillance</option><option>Autre</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>Adresse</label>
+            <input type="text" id="f-adresse" placeholder="Adresse">
+          </div>
+          <div class="form-group flex-1">
+            <label>Ville</label>
+            <input type="text" id="f-ville" placeholder="Ville">
+          </div>
+        </div>
+
+        <div class="form-section-title mt12">Contact</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Nom du contact</label>
+            <input type="text" id="f-contact-nom" placeholder="Nom Prénom">
+          </div>
+          <div class="form-group flex-1">
+            <label>Téléphone</label>
+            <input type="tel" id="f-contact-telephone" placeholder="0X XX XX XX XX">
+          </div>
+          <div class="form-group flex-1">
+            <label>Email</label>
+            <input type="email" id="f-contact-email" placeholder="contact@societe.fr">
+          </div>
+        </div>
+
+        <div class="form-section-title mt12">Contrat</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Début de contrat</label>
+            <input type="date" id="f-date-debut">
+          </div>
+          <div class="form-group flex-1">
+            <label>Fin de contrat</label>
+            <input type="date" id="f-date-fin">
+          </div>
+          <div class="form-group flex-1">
+            <label>Statut</label>
+            <select id="f-statut">
+              <option>Actif</option><option>Suspendu</option><option>Terminé</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Tarif</label>
+            <input type="number" id="f-tarif" placeholder="0" min="0">
+          </div>
+          <div class="form-group flex-1">
+            <label>Unité</label>
+            <select id="f-tarif-unite">
+              <option value="mensuel">Mensuel</option><option value="horaire">Horaire</option><option value="forfait">Forfait</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group mt8">
+          <label>Notes</label>
+          <textarea id="f-notes" rows="3" placeholder="Informations complémentaires…"></textarea>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tab Sites & Agents -->
+    <div id="mtab-sites" class="modal-tab-content">
+      <div class="activite-add">
+        <input type="text" id="new-site-nom" placeholder="Nom du site…" class="search-input">
+        <input type="text" id="new-site-adresse" placeholder="Adresse du site…" class="search-input">
+        <button class="btn-primary" onclick="addSite()">Ajouter le site</button>
+      </div>
+      <div id="sites-list" class="mt12"></div>
+    </div>
+
+    <!-- Tab Documents -->
+    <div id="mtab-documents" class="modal-tab-content">
+      <div class="activite-add">
+        <select id="new-doc-type" class="filter-select">
+          <option value="devis">Devis</option><option value="contrat">Contrat</option>
+          <option value="facture">Facture</option><option value="autre">Autre</option>
+        </select>
+        <input type="file" id="new-doc-file" class="search-input">
+        <button class="btn-primary" onclick="uploadDocument()">Envoyer</button>
+      </div>
+      <div id="documents-list" class="mt12"></div>
+    </div>
+
+    <!-- Tab Historique -->
+    <div id="mtab-historique" class="modal-tab-content">
+      <div class="activite-add">
+        <select id="new-hist-type" class="filter-select">
+          <option>Échange</option><option>Incident</option><option>Renouvellement</option><option>Note</option>
+        </select>
+        <input type="text" id="new-hist-desc" placeholder="Description…" class="search-input">
+        <button class="btn-primary" onclick="addHistorique()">Ajouter</button>
+      </div>
+      <div id="historique-list" class="mt12"></div>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn-ghost" onclick="closeClientModal()">Annuler</button>
+      <button class="btn-danger" id="btn-delete" onclick="deleteClient()" style="display:none">🗑 Supprimer</button>
+      <button class="btn-primary" onclick="saveClient()">💾 Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
