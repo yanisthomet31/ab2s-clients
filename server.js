@@ -11,6 +11,7 @@ const app = express();
 const PORT = process.env.PORT || 3739;
 const upload = multer({ storage: multer.memoryStorage() });
 
+app.set('trust proxy', 1); // Render (et tout proxy inverse) termine le HTTPS en amont — sans ça, cookie.secure ne voit jamais la requête comme sécurisée et le cookie de session n'est jamais envoyé.
 app.use(cors());
 app.use(express.json());
 
