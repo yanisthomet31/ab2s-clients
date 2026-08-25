@@ -18,8 +18,12 @@ app.use(express.json());
 // ─── Base de données PostgreSQL ───────────────────────
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000 // échoue vite plutôt que de bloquer indéfiniment si la base ne répond pas
 });
+pool.on('error', (err) => console.error('❌ Erreur inattendue du pool PostgreSQL:', err.message));
 
 async function query(text, params) {
   const client = await pool.connect();
@@ -141,7 +145,7 @@ app.post('/api/change-password', async (req, res) => {
   const { rows } = await query('SELECT * FROM users WHERE id=$1', [req.session.userId]);
   const user = rows[0];
   if (!user || !bcrypt.compareSync(ancien || '', user.password_hash)) {
-    return res.status(401).json({ error: 'Ancien mot de passe incorrect' });
+    return res.status(400).json({ error: 'Ancien mot de passe incorrect' });
   }
   if (!nouveau || nouveau.length < 6) {
     return res.status(400).json({ error: 'Le nouveau mot de passe doit faire au moins 6 caractères' });
