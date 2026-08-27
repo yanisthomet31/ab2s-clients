@@ -112,6 +112,7 @@ async function loadClients() {
     <tr onclick="openClientModal(${c.id})">
       <td><strong>${c.societe}</strong></td>
       <td><span class="segment-badge">${c.type_client === 'Occasionnel' ? '📋 Occasionnel' : '🔒 Régulier'}</span></td>
+      <td>${c.categorie_client || '—'}</td>
       <td>${c.contact_nom || '—'}</td>
       <td>${c.ville || '—'}</td>
       <td>${c.type_prestation || '—'}</td>
@@ -139,8 +140,13 @@ async function openClientModal(id = null) {
     document.getElementById('f-code-client').value       = data.code_client || '';
     document.getElementById('f-type-prestation').value   = data.type_prestation || 'Gardiennage';
     document.getElementById('f-type-client').value        = data.type_client || 'Régulier';
+    document.getElementById('f-categorie-client').value   = data.categorie_client || 'Autres';
     document.getElementById('f-adresse').value           = data.adresse || '';
     document.getElementById('f-ville').value             = data.ville || '';
+    document.getElementById('f-siret').value             = data.siret || '';
+    document.getElementById('f-tva').value               = data.tva || '';
+    document.getElementById('f-capital-social').value    = data.capital_social || '';
+    document.getElementById('f-site-web').value          = data.site_web || '';
     document.getElementById('f-contact-nom').value       = data.contact_nom || '';
     document.getElementById('f-contact-telephone').value = data.contact_telephone || '';
     document.getElementById('f-contact-email').value     = data.contact_email || '';
@@ -163,6 +169,7 @@ async function openClientModal(id = null) {
     document.getElementById('f-id').value = '';
     document.getElementById('f-statut').value = 'Actif';
     document.getElementById('f-type-client').value = 'Régulier';
+    document.getElementById('f-categorie-client').value = 'Autres';
     toggleTaciteReconduction();
     showClientLogoPreview(null);
     document.getElementById('sites-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des sites</div>';
@@ -232,9 +239,14 @@ async function saveClient() {
     societe:            document.getElementById('f-societe').value.trim(),
     code_client:        document.getElementById('f-code-client').value.trim(),
     type_prestation:    document.getElementById('f-type-prestation').value,
+    categorie_client:   document.getElementById('f-categorie-client').value,
     type_client:        document.getElementById('f-type-client').value,
     adresse:            document.getElementById('f-adresse').value.trim(),
     ville:              document.getElementById('f-ville').value.trim(),
+    siret:              document.getElementById('f-siret').value.trim(),
+    tva:                document.getElementById('f-tva').value.trim(),
+    capital_social:     document.getElementById('f-capital-social').value.trim(),
+    site_web:           document.getElementById('f-site-web').value.trim(),
     contact_nom:        document.getElementById('f-contact-nom').value.trim(),
     contact_telephone:  document.getElementById('f-contact-telephone').value.trim(),
     contact_email:      document.getElementById('f-contact-email').value.trim(),

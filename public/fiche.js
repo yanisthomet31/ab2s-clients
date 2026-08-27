@@ -47,6 +47,11 @@
   document.getElementById('f-telephone').textContent = data.contact_telephone || '—';
   document.getElementById('f-email').textContent = data.contact_email || '—';
 
+  // Informations légales
+  document.getElementById('f-siret').textContent = data.siret || '—';
+  document.getElementById('f-tva').textContent = data.tva || '—';
+  document.getElementById('f-capital-social').textContent = data.capital_social || '—';
+
   // Contrat
   document.getElementById('f-type-prestation').textContent = data.type_prestation || '—';
   document.getElementById('f-date-debut').textContent = data.date_debut_contrat ? formatDate(data.date_debut_contrat) : '—';
@@ -58,6 +63,7 @@
     : '—';
   document.getElementById('f-statut').textContent = data.statut || 'Actif';
   document.getElementById('f-type-client').textContent = data.type_client === 'Occasionnel' ? 'Occasionnel — sur devis' : 'Régulier — contrat fixe';
+  document.getElementById('f-categorie-client').textContent = data.categorie_client || '—';
 
   // Sites & agents
   const sites = data.sites || [];

@@ -62,7 +62,9 @@ async function initDB() {
       code_client TEXT,
       contact_nom TEXT, contact_telephone TEXT, contact_email TEXT,
       adresse TEXT, ville TEXT,
+      siret TEXT, tva TEXT, capital_social TEXT, site_web TEXT,
       type_prestation TEXT,
+      categorie_client TEXT,
       type_client TEXT DEFAULT 'Régulier',
       date_debut_contrat DATE, date_fin_contrat DATE,
       tacite_reconduction BOOLEAN DEFAULT FALSE,
@@ -76,6 +78,11 @@ async function initDB() {
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS type_client TEXT DEFAULT 'Régulier';
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS tacite_reconduction BOOLEAN DEFAULT FALSE;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS code_client TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS categorie_client TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS siret TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS tva TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS capital_social TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS site_web TEXT;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_contenu BYTEA;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_mime_type TEXT;
     CREATE TABLE IF NOT EXISTS client_sites (
@@ -191,8 +198,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ─── Routes Clients ────────────────────────────────────
 // Colonnes sans le logo (BYTEA) — évite de le charger inutilement dans les listes
 const CLIENT_COLUMNS = `id, societe, code_client, contact_nom, contact_telephone, contact_email,
-  adresse, ville, type_prestation, type_client, date_debut_contrat, date_fin_contrat,
-  tacite_reconduction, tarif, tarif_unite, statut, notes, logo_mime_type, created_at, updated_at`;
+  adresse, ville, siret, tva, capital_social, site_web, type_prestation, categorie_client, type_client,
+  date_debut_contrat, date_fin_contrat, tacite_reconduction, tarif, tarif_unite, statut, notes,
+  logo_mime_type, created_at, updated_at`;
 
 app.get('/api/clients', async (req, res) => {
   const { search, type_client } = req.query;
@@ -241,11 +249,13 @@ app.get('/api/clients/:id', async (req, res) => {
 app.post('/api/clients', async (req, res) => {
   const f = req.body;
   const { rows } = await query(
-    `INSERT INTO clients (societe,code_client,contact_nom,contact_telephone,contact_email,adresse,ville,type_prestation,
-       type_client,date_debut_contrat,date_fin_contrat,tacite_reconduction,tarif,tarif_unite,statut,notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
-    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
-     f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
+    `INSERT INTO clients (societe,code_client,contact_nom,contact_telephone,contact_email,adresse,ville,
+       siret,tva,capital_social,site_web,type_prestation,
+       categorie_client,type_client,date_debut_contrat,date_fin_contrat,tacite_reconduction,tarif,tarif_unite,statut,notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING id`,
+    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville,
+     f.siret, f.tva, f.capital_social, f.site_web, f.type_prestation,
+     f.categorie_client, f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
      !!f.tacite_reconduction, parseFloat(f.tarif) || 0, f.tarif_unite || 'mensuel', f.statut || 'Actif', f.notes]);
   res.json({ id: rows[0].id });
 });
@@ -254,10 +264,12 @@ app.put('/api/clients/:id', async (req, res) => {
   const f = req.body;
   await query(
     `UPDATE clients SET societe=$1,code_client=$2,contact_nom=$3,contact_telephone=$4,contact_email=$5,adresse=$6,ville=$7,
-       type_prestation=$8,type_client=$9,date_debut_contrat=$10,date_fin_contrat=$11,tacite_reconduction=$12,
-       tarif=$13,tarif_unite=$14,statut=$15,notes=$16,updated_at=NOW() WHERE id=$17`,
-    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
-     f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
+       siret=$8,tva=$9,capital_social=$10,site_web=$11,type_prestation=$12,
+       categorie_client=$13,type_client=$14,date_debut_contrat=$15,date_fin_contrat=$16,tacite_reconduction=$17,
+       tarif=$18,tarif_unite=$19,statut=$20,notes=$21,updated_at=NOW() WHERE id=$22`,
+    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville,
+     f.siret, f.tva, f.capital_social, f.site_web, f.type_prestation,
+     f.categorie_client, f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
      !!f.tacite_reconduction, parseFloat(f.tarif) || 0, f.tarif_unite, f.statut, f.notes, req.params.id]);
   res.json({ ok: true });
 });
@@ -428,12 +440,14 @@ app.get('/api/kpi', async (req, res) => {
 // ─── Export CSV ───────────────────────────────────────
 app.get('/api/export/csv', async (req, res) => {
   const { rows } = await query(`SELECT ${CLIENT_COLUMNS} FROM clients ORDER BY societe`);
-  const headers = ['ID','Code client','Société','Type de client','Contact','Téléphone','Email','Adresse','Ville',
+  const headers = ['ID','Code client','Société','Catégorie','Type de client','Contact','Téléphone','Email','Adresse','Ville',
+    'SIRET','N° TVA','Capital social','Site web',
     'Type de prestation','Début contrat','Fin contrat','Tarif','Unité','Statut','Notes','Créé le','Modifié le'];
   const csv = [
     headers.join(';'),
-    ...rows.map(r => [r.id, r.code_client, r.societe, r.type_client, r.contact_nom, r.contact_telephone, r.contact_email,
-      r.adresse, r.ville, r.type_prestation, r.date_debut_contrat, r.date_fin_contrat, r.tarif, r.tarif_unite,
+    ...rows.map(r => [r.id, r.code_client, r.societe, r.categorie_client, r.type_client, r.contact_nom, r.contact_telephone, r.contact_email,
+      r.adresse, r.ville, r.siret, r.tva, r.capital_social, r.site_web,
+      r.type_prestation, r.date_debut_contrat, r.date_fin_contrat, r.tarif, r.tarif_unite,
       r.statut, `"${(r.notes||'').replace(/"/g,'""')}"`, r.created_at, r.updated_at].join(';'))
   ].join('\n');
   res.setHeader('Content-Type', 'text/csv;charset=utf-8');

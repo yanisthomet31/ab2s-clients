@@ -100,7 +100,7 @@
     <div class="card mt12">
       <table class="table" id="clients-table">
         <thead><tr>
-          <th>Société</th><th>Type</th><th>Contact</th><th>Ville</th>
+          <th>Société</th><th>Type</th><th>Catégorie</th><th>Contact</th><th>Ville</th>
           <th>Type de prestation</th><th>Statut</th><th>Fin de contrat</th>
         </tr></thead>
         <tbody id="clients-body"></tbody>
@@ -193,6 +193,15 @@
               <option value="Occasionnel">📋 Occasionnel (sur devis)</option>
             </select>
           </div>
+          <div class="form-group flex-1">
+            <label>Catégorie de client</label>
+            <select id="f-categorie-client">
+              <option value="Collectivité locale">Collectivité locale</option>
+              <option value="Grande distribution">Grande distribution</option>
+              <option value="Société de sécurité privée">Société de sécurité privée</option>
+              <option value="Autres">Autres</option>
+            </select>
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group flex-2">
@@ -202,6 +211,26 @@
           <div class="form-group flex-1">
             <label>Ville</label>
             <input type="text" id="f-ville" placeholder="Ville">
+          </div>
+        </div>
+
+        <div class="form-section-title mt12">Informations légales</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>SIRET</label>
+            <input type="text" id="f-siret" placeholder="14 chiffres">
+          </div>
+          <div class="form-group flex-1">
+            <label>N° TVA</label>
+            <input type="text" id="f-tva" placeholder="FR XX XXXXXXXXX">
+          </div>
+          <div class="form-group flex-1">
+            <label>Capital social</label>
+            <input type="text" id="f-capital-social" placeholder="ex : 10 000 €">
+          </div>
+          <div class="form-group flex-1">
+            <label>Site web</label>
+            <input type="text" id="f-site-web" placeholder="https://…">
           </div>
         </div>
 
