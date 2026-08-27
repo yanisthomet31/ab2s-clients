@@ -4,7 +4,6 @@
 
 const API = window.location.origin;
 let currentClientId = null;
-let allAgents = [];
 
 // ─── Init ─────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -12,10 +11,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!me || !me.nom) { window.location.href = '/login.html'; return; }
   document.getElementById('connected-as').textContent = `Connecté : ${me.nom}`;
 
-  loadAgents().then(() => {
-    loadDashboard();
-    loadClients();
-  });
+  loadDashboard();
+  loadClients();
 });
 
 async function logout() {
@@ -48,7 +45,7 @@ function showTab(name) {
 
   if (name === 'dashboard') loadDashboard();
   if (name === 'clients')   loadClients();
-  if (name === 'agents')    renderAgentsTab();
+  if (name === 'sites')     loadSitesGlobal();
   if (name === 'carte')     loadCarteClients();
 }
 
@@ -74,7 +71,6 @@ async function loadDashboard() {
   if (!kpi) return;
   document.getElementById('k-clients').textContent   = kpi.clients_actifs;
   document.getElementById('k-sites').textContent      = kpi.sites;
-  document.getElementById('k-agents').textContent     = kpi.agents;
   document.getElementById('k-documents').textContent  = kpi.documents;
   document.getElementById('k-echeances').textContent  = kpi.echeances_30j;
 }
@@ -163,6 +159,7 @@ async function openClientModal(id = null) {
     renderDocuments(data.documents || []);
     renderHistorique(data.historique || []);
     renderContacts(data.contacts || []);
+    renderTarifs(data.tarifs || []);
     showClientLogoPreview(data.logo_mime_type ? id : null);
   } else {
     document.getElementById('modal-title').textContent = 'Nouveau client';
@@ -177,6 +174,7 @@ async function openClientModal(id = null) {
     document.getElementById('documents-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des documents</div>';
     document.getElementById('historique-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter un historique</div>';
     document.getElementById('contacts-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des contacts</div>';
+    document.getElementById('tarifs-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des tarifs</div>';
   }
 }
 
@@ -349,12 +347,10 @@ async function deleteContact(id) {
   renderContacts(data.contacts || []);
 }
 
-// ─── SITES & AGENTS (dans le modal) ───────────────────
+// ─── SITES (dans le modal) ─────────────────────────────
 function renderSites(sites) {
   const el = document.getElementById('sites-list');
   if (!sites.length) { el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:24px">Aucun site enregistré</div>'; return; }
-
-  const agentOptions = allAgents.map(a => `<option value="${a.id}">${a.nom}</option>`).join('');
 
   el.innerHTML = sites.map(s => `
     <div class="activite-item">
@@ -363,17 +359,6 @@ function renderSites(sites) {
           <span class="activite-type">${s.nom_site}</span>
           ${s.code_site ? `<span class="segment-badge">${s.code_site}</span>` : ''}
           <span class="activite-auteur">${s.adresse_site || ''}</span>
-        </div>
-        <div class="activite-desc" style="margin-top:8px">
-          ${(s.agents || []).map(a => `
-            <span class="segment-badge" style="margin:2px 6px 2px 0">
-              👤 ${a.nom} <span style="cursor:pointer" onclick="removeAgentFromSite(${s.id},${a.id})">✕</span>
-            </span>
-          `).join('') || '<span style="color:var(--text2);font-size:12px">Aucun agent affecté</span>'}
-        </div>
-        <div style="display:flex;gap:8px;margin-top:8px">
-          <select id="site-agent-${s.id}" class="filter-select" style="max-width:180px">${agentOptions}</select>
-          <button class="btn-ghost btn-sm" onclick="assignAgentToSite(${s.id})">+ Affecter</button>
         </div>
       </div>
       <span class="activite-del" onclick="deleteSite(${s.id})">✕</span>
@@ -405,51 +390,84 @@ async function deleteSite(id) {
   loadDashboard();
 }
 
-async function assignAgentToSite(siteId) {
-  const agentId = document.getElementById(`site-agent-${siteId}`).value;
-  if (!agentId) return;
-  await api(`/api/sites/${siteId}/agents/${agentId}`, { method: 'POST', body: {} });
-  const data = await api(`/api/clients/${currentClientId}`);
-  renderSites(data.sites || []);
+// ─── SITES (onglet global, accordéon par client) ──────
+let sitesGlobalOpen = new Set();
+async function loadSitesGlobal() {
+  const clients = await api('/api/clients-sites') || [];
+  const list = document.getElementById('sites-global-list');
+  const empty = document.getElementById('sites-global-empty');
+
+  if (!clients.length) {
+    list.innerHTML = '';
+    empty.style.display = '';
+    return;
+  }
+  empty.style.display = 'none';
+  list.innerHTML = clients.map(c => {
+    const isOpen = sitesGlobalOpen.has(c.id);
+    return `
+    <div class="card mt12">
+      <div class="card-header" style="cursor:pointer;user-select:none" onclick="toggleSitesGlobal(${c.id})">
+        <h3>${isOpen ? '▾' : '▸'} ${c.societe} <span style="color:var(--text2);font-weight:400;font-size:12.5px">(${c.sites.length} site${c.sites.length>1?'s':''})</span></h3>
+      </div>
+      ${isOpen ? `
+        <table class="table">
+          <thead><tr><th>Site</th><th>Code</th><th>Adresse</th></tr></thead>
+          <tbody>
+            ${c.sites.map(s => `
+              <tr onclick="openClientModal(${c.id})">
+                <td>${s.nom_site}</td>
+                <td>${s.code_site ? `<span class="segment-badge">${s.code_site}</span>` : '—'}</td>
+                <td>${s.adresse_site || '—'}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : ''}
+    </div>
+  `;
+  }).join('');
 }
 
-async function removeAgentFromSite(siteId, agentId) {
-  await api(`/api/sites/${siteId}/agents/${agentId}`, { method: 'DELETE' });
-  const data = await api(`/api/clients/${currentClientId}`);
-  renderSites(data.sites || []);
+function toggleSitesGlobal(clientId) {
+  if (sitesGlobalOpen.has(clientId)) sitesGlobalOpen.delete(clientId);
+  else sitesGlobalOpen.add(clientId);
+  loadSitesGlobal();
 }
 
-// ─── AGENTS (onglet global) ────────────────────────────
-async function loadAgents() {
-  allAgents = await api('/api/agents') || [];
-}
-
-function renderAgentsTab() {
-  const el = document.getElementById('agents-list');
-  if (!allAgents.length) { el.innerHTML = '<div class="empty-state">Aucun agent enregistré</div>'; return; }
-  el.innerHTML = allAgents.map(a => `
+// ─── TARIFS (dans le modal) ────────────────────────────
+function renderTarifs(tarifs) {
+  const el = document.getElementById('tarifs-list');
+  if (!tarifs.length) { el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:24px">Aucun tarif enregistré</div>'; return; }
+  el.innerHTML = tarifs.map(t => `
     <div class="activite-item">
-      <div class="activite-body"><span class="activite-type">${a.nom}</span></div>
-      <span class="activite-del" onclick="removeAgent(${a.id})">✕</span>
+      <div class="activite-body">
+        <span class="activite-type">${t.annee}</span>
+        <span class="activite-desc">${Number(t.taux_horaire).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € / heure</span>
+      </div>
+      <span class="activite-del" onclick="deleteTarif(${t.id})">✕</span>
     </div>
   `).join('');
 }
 
-async function addAgent() {
-  const nom = document.getElementById('new-agent-nom').value.trim();
-  if (!nom) { toast('Nom requis', true); return; }
-  await api('/api/agents', { method: 'POST', body: { nom } });
-  document.getElementById('new-agent-nom').value = '';
-  await loadAgents();
-  renderAgentsTab();
-  toast('Agent ajouté ✔');
+async function addTarif() {
+  if (!currentClientId) { toast('Enregistrez d\'abord le client', true); return; }
+  const annee = document.getElementById('new-tarif-annee').value.trim();
+  const taux_horaire = document.getElementById('new-tarif-taux').value.trim();
+  if (!annee || !taux_horaire) { toast('Année et taux horaire requis', true); return; }
+  await api(`/api/clients/${currentClientId}/tarifs`, { method: 'POST', body: { annee, taux_horaire } });
+  document.getElementById('new-tarif-annee').value = '';
+  document.getElementById('new-tarif-taux').value = '';
+  const data = await api(`/api/clients/${currentClientId}`);
+  renderTarifs(data.tarifs || []);
+  toast('Tarif ajouté ✔');
 }
 
-async function removeAgent(id) {
-  if (!confirm('Retirer cet agent de la liste ?')) return;
-  await api(`/api/agents/${id}`, { method: 'DELETE' });
-  await loadAgents();
-  renderAgentsTab();
+async function deleteTarif(id) {
+  if (!confirm('Supprimer ce tarif ?')) return;
+  await api(`/api/tarifs/${id}`, { method: 'DELETE' });
+  const data = await api(`/api/clients/${currentClientId}`);
+  renderTarifs(data.tarifs || []);
 }
 
 // ─── DOCUMENTS (dans le modal) ─────────────────────────

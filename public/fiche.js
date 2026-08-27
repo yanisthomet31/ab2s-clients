@@ -65,7 +65,22 @@
   document.getElementById('f-type-client').textContent = data.type_client === 'Occasionnel' ? 'Occasionnel — sur devis' : 'Régulier — contrat fixe';
   document.getElementById('f-categorie-client').textContent = data.categorie_client || '—';
 
-  // Sites & agents
+  // Autres contacts
+  const contacts = data.contacts || [];
+  if (!contacts.length) {
+    document.getElementById('section-contacts').style.display = 'none';
+  } else {
+    document.getElementById('contacts-tbody').innerHTML = contacts.map(c => `
+      <tr>
+        <td class="site-name">${esc(c.nom)}</td>
+        <td>${esc(c.poste || '—')}</td>
+        <td>${esc(c.telephone || '—')}</td>
+        <td>${esc(c.email || '—')}</td>
+      </tr>
+    `).join('');
+  }
+
+  // Sites
   const sites = data.sites || [];
   if (!sites.length) {
     document.getElementById('section-sites').style.display = 'none';
@@ -77,7 +92,19 @@
           ${s.code_site ? `<span class="site-code">${esc(s.code_site)}</span>` : ''}
         </td>
         <td>${esc(s.adresse_site || '—')}</td>
-        <td>${(s.agents || []).map(a => `<span class="agent-tag">${esc(a.nom)}</span>`).join('') || '—'}</td>
+      </tr>
+    `).join('');
+  }
+
+  // Historique tarifaire
+  const tarifs = data.tarifs || [];
+  if (!tarifs.length) {
+    document.getElementById('section-tarifs').style.display = 'none';
+  } else {
+    document.getElementById('tarifs-tbody').innerHTML = tarifs.map(t => `
+      <tr>
+        <td class="site-name">${t.annee}</td>
+        <td>${Number(t.taux_horaire).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € / heure</td>
       </tr>
     `).join('');
   }

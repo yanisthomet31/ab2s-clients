@@ -98,7 +98,6 @@
   .sites-table tr:last-child td { border-bottom: none; }
   .site-name { font-weight: 600; color: var(--ink); }
   .site-code { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--navy); background: var(--tint); padding: 1px 6px; border-radius: 3px; margin-top: 2px; }
-  .agent-tag { display: inline-block; font-size: 11.5px; color: var(--ink2); background: var(--tint); padding: 2px 8px; border-radius: 20px; margin: 0 4px 3px 0; }
 
   .notes-box { font-size: 13px; color: var(--ink2); line-height: 1.55; background: var(--tint); border-left: 3px solid var(--orange); border-radius: 0 4px 4px 0; padding: 3.5mm 5mm; }
 
@@ -161,6 +160,14 @@
     </div>
   </div>
 
+  <div class="section" id="section-contacts">
+    <div class="section-label">Autres contacts</div>
+    <table class="sites-table">
+      <thead><tr><th style="width:28%">Nom</th><th style="width:22%">Poste</th><th style="width:25%">Téléphone</th><th>Email</th></tr></thead>
+      <tbody id="contacts-tbody"></tbody>
+    </table>
+  </div>
+
   <div class="section">
     <div class="section-label">Informations légales</div>
     <div class="field-grid">
@@ -184,10 +191,18 @@
   </div>
 
   <div class="section" id="section-sites">
-    <div class="section-label">Sites &amp; agents affectés</div>
+    <div class="section-label">Sites</div>
     <table class="sites-table">
-      <thead><tr><th style="width:34%">Site</th><th style="width:32%">Adresse</th><th>Agents affectés</th></tr></thead>
+      <thead><tr><th style="width:40%">Site</th><th>Adresse</th></tr></thead>
       <tbody id="sites-tbody"></tbody>
+    </table>
+  </div>
+
+  <div class="section" id="section-tarifs">
+    <div class="section-label">Historique tarifaire</div>
+    <table class="sites-table">
+      <thead><tr><th style="width:30%">Année</th><th>Taux horaire</th></tr></thead>
+      <tbody id="tarifs-tbody"></tbody>
     </table>
   </div>
 

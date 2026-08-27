@@ -107,15 +107,14 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     );
     ALTER TABLE client_sites ADD COLUMN IF NOT EXISTS code_site TEXT;
-    CREATE TABLE IF NOT EXISTS agents (
+    DROP TABLE IF EXISTS site_agents;
+    DROP TABLE IF EXISTS agents;
+    CREATE TABLE IF NOT EXISTS client_tarifs (
       id SERIAL PRIMARY KEY,
-      nom TEXT UNIQUE NOT NULL,
-      actif BOOLEAN DEFAULT TRUE
-    );
-    CREATE TABLE IF NOT EXISTS site_agents (
-      site_id INTEGER REFERENCES client_sites(id) ON DELETE CASCADE,
-      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
-      PRIMARY KEY (site_id, agent_id)
+      client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+      annee INTEGER NOT NULL,
+      taux_horaire NUMERIC,
+      created_at TIMESTAMP DEFAULT NOW()
     );
     CREATE TABLE IF NOT EXISTS client_documents (
       id SERIAL PRIMARY KEY,
@@ -237,24 +236,17 @@ app.get('/api/clients/check-doublon', async (req, res) => {
 
 app.get('/api/clients/:id', async (req, res) => {
   const id = req.params.id;
-  const [clientR, sitesR, docsR, histR, contactsR] = await Promise.all([
+  const [clientR, sitesR, docsR, histR, contactsR, tarifsR] = await Promise.all([
     query(`SELECT ${CLIENT_COLUMNS} FROM clients WHERE id=$1`, [id]),
     query('SELECT * FROM client_sites WHERE client_id=$1 ORDER BY created_at', [id]),
     query('SELECT id, client_id, type, nom_fichier, mime_type, taille_octets, uploaded_by, uploaded_at FROM client_documents WHERE client_id=$1 ORDER BY uploaded_at DESC', [id]),
     query('SELECT * FROM client_historique WHERE client_id=$1 ORDER BY date DESC', [id]),
-    query('SELECT * FROM client_contacts WHERE client_id=$1 ORDER BY created_at', [id])
+    query('SELECT * FROM client_contacts WHERE client_id=$1 ORDER BY created_at', [id]),
+    query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee', [id])
   ]);
   if (!clientR.rows[0]) return res.status(404).json({ error: 'Introuvable' });
 
-  const sites = sitesR.rows;
-  for (const site of sites) {
-    const { rows } = await query(
-      `SELECT a.* FROM agents a JOIN site_agents sa ON sa.agent_id=a.id WHERE sa.site_id=$1 ORDER BY a.nom`,
-      [site.id]);
-    site.agents = rows;
-  }
-
-  res.json({ ...clientR.rows[0], sites, documents: docsR.rows, historique: histR.rows, contacts: contactsR.rows });
+  res.json({ ...clientR.rows[0], sites: sitesR.rows, documents: docsR.rows, historique: histR.rows, contacts: contactsR.rows, tarifs: tarifsR.rows });
 });
 
 app.post('/api/clients', async (req, res) => {
@@ -366,33 +358,35 @@ app.delete('/api/sites/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-// ─── Routes Agents ──────────────────────────────────────
-app.get('/api/agents', async (req, res) => {
-  const { rows } = await query('SELECT * FROM agents WHERE actif=true ORDER BY nom');
+// ─── Route Sites (vue globale par client) ──────────────
+app.get('/api/clients-sites', async (req, res) => {
+  const { rows: clients } = await query(
+    `SELECT id, societe, code_client FROM clients ORDER BY societe`);
+  for (const c of clients) {
+    const { rows } = await query(
+      'SELECT id, nom_site, code_site, adresse_site FROM client_sites WHERE client_id=$1 ORDER BY created_at',
+      [c.id]);
+    c.sites = rows;
+  }
+  res.json(clients.filter(c => c.sites.length > 0));
+});
+
+// ─── Routes Tarifs ──────────────────────────────────────
+app.get('/api/clients/:clientId/tarifs', async (req, res) => {
+  const { rows } = await query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee', [req.params.clientId]);
   res.json(rows);
 });
 
-app.post('/api/agents', async (req, res) => {
+app.post('/api/clients/:clientId/tarifs', async (req, res) => {
+  const { annee, taux_horaire } = req.body;
   const { rows } = await query(
-    'INSERT INTO agents (nom) VALUES ($1) ON CONFLICT (nom) DO NOTHING RETURNING id',
-    [req.body.nom]);
-  res.json({ id: rows[0]?.id });
+    'INSERT INTO client_tarifs (client_id,annee,taux_horaire) VALUES ($1,$2,$3) RETURNING id',
+    [req.params.clientId, parseInt(annee), parseFloat(taux_horaire) || 0]);
+  res.json({ id: rows[0].id });
 });
 
-app.delete('/api/agents/:id', async (req, res) => {
-  await query('UPDATE agents SET actif=false WHERE id=$1', [req.params.id]);
-  res.json({ ok: true });
-});
-
-app.post('/api/sites/:siteId/agents/:agentId', async (req, res) => {
-  await query(
-    'INSERT INTO site_agents (site_id,agent_id) VALUES ($1,$2) ON CONFLICT DO NOTHING',
-    [req.params.siteId, req.params.agentId]);
-  res.json({ ok: true });
-});
-
-app.delete('/api/sites/:siteId/agents/:agentId', async (req, res) => {
-  await query('DELETE FROM site_agents WHERE site_id=$1 AND agent_id=$2', [req.params.siteId, req.params.agentId]);
+app.delete('/api/tarifs/:id', async (req, res) => {
+  await query('DELETE FROM client_tarifs WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
 });
 
@@ -452,17 +446,15 @@ app.delete('/api/historique/:id', async (req, res) => {
 
 // ─── KPI ────────────────────────────────────────────────
 app.get('/api/kpi', async (req, res) => {
-  const [actifsR, sitesR, agentsR, docsR, echeanceR] = await Promise.all([
+  const [actifsR, sitesR, docsR, echeanceR] = await Promise.all([
     query("SELECT COUNT(*) n FROM clients WHERE statut='Actif'"),
     query('SELECT COUNT(*) n FROM client_sites'),
-    query('SELECT COUNT(*) n FROM agents WHERE actif=true'),
     query('SELECT COUNT(*) n FROM client_documents'),
     query("SELECT COUNT(*) n FROM clients WHERE date_fin_contrat BETWEEN NOW() AND NOW() + INTERVAL '30 days'")
   ]);
   res.json({
     clients_actifs: parseInt(actifsR.rows[0].n),
     sites: parseInt(sitesR.rows[0].n),
-    agents: parseInt(agentsR.rows[0].n),
     documents: parseInt(docsR.rows[0].n),
     echeances_30j: parseInt(echeanceR.rows[0].n)
   });

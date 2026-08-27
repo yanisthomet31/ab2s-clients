@@ -27,8 +27,8 @@
     <a class="nav-item" data-tab="clients" onclick="showTab('clients')">
       <span class="nav-icon">🏢</span><span>Clients</span>
     </a>
-    <a class="nav-item" data-tab="agents" onclick="showTab('agents')">
-      <span class="nav-icon">👤</span><span>Agents</span>
+    <a class="nav-item" data-tab="sites" onclick="showTab('sites')">
+      <span class="nav-icon">📍</span><span>Sites</span>
     </a>
     <a class="nav-item" data-tab="carte" onclick="showTab('carte')">
       <span class="nav-icon">🗺️</span><span>Carte des clients</span>
@@ -61,11 +61,6 @@
         <div class="kpi-label">Sites surveillés</div>
         <div class="kpi-value" id="k-sites">—</div>
         <div class="kpi-icon">📍</div>
-      </div>
-      <div class="kpi-card purple">
-        <div class="kpi-label">Agents</div>
-        <div class="kpi-value" id="k-agents">—</div>
-        <div class="kpi-icon">👤</div>
       </div>
       <div class="kpi-card teal">
         <div class="kpi-label">Documents</div>
@@ -113,15 +108,13 @@
     </div>
   </section>
 
-  <!-- ═══════════════════ AGENTS ═══════════════════ -->
-  <section id="tab-agents" class="tab-section">
-    <div class="page-header"><h1>Agents</h1></div>
-    <div class="card">
-      <div class="activite-add">
-        <input type="text" id="new-agent-nom" placeholder="Nom de l'agent…" class="search-input">
-        <button class="btn-primary" onclick="addAgent()">Ajouter</button>
-      </div>
-      <div id="agents-list" class="mt12"></div>
+  <!-- ═══════════════════ SITES (vue globale) ═══════════════════ -->
+  <section id="tab-sites" class="tab-section">
+    <div class="page-header"><h1>Sites</h1></div>
+    <div id="sites-global-list"></div>
+    <div id="sites-global-empty" class="empty-state" style="display:none">
+      <div class="empty-icon">📍</div>
+      <p>Aucun site enregistré pour le moment</p>
     </div>
   </section>
 
@@ -148,7 +141,8 @@
     <div class="modal-tabs">
       <button class="modal-tab active" onclick="switchModalTab('infos',this)">📋 Informations</button>
       <button class="modal-tab" onclick="switchModalTab('contacts',this)">📇 Contacts</button>
-      <button class="modal-tab" onclick="switchModalTab('sites',this)">📍 Sites & Agents</button>
+      <button class="modal-tab" onclick="switchModalTab('sites',this)">📍 Sites</button>
+      <button class="modal-tab" onclick="switchModalTab('tarifs',this)">💶 Tarifs</button>
       <button class="modal-tab" onclick="switchModalTab('documents',this)">📄 Documents</button>
       <button class="modal-tab" onclick="switchModalTab('historique',this)">📝 Historique</button>
     </div>
@@ -304,7 +298,7 @@
       <div id="contacts-list" class="mt12"></div>
     </div>
 
-    <!-- Tab Sites & Agents -->
+    <!-- Tab Sites -->
     <div id="mtab-sites" class="modal-tab-content">
       <div class="activite-add">
         <input type="text" id="new-site-nom" placeholder="Nom du site…" class="search-input">
@@ -313,6 +307,16 @@
         <button class="btn-primary" onclick="addSite()">Ajouter le site</button>
       </div>
       <div id="sites-list" class="mt12"></div>
+    </div>
+
+    <!-- Tab Tarifs -->
+    <div id="mtab-tarifs" class="modal-tab-content">
+      <div class="activite-add">
+        <input type="number" id="new-tarif-annee" placeholder="Année…" class="filter-select" style="max-width:110px">
+        <input type="number" id="new-tarif-taux" placeholder="Taux horaire (€)…" step="0.01" min="0" class="search-input">
+        <button class="btn-primary" onclick="addTarif()">Ajouter</button>
+      </div>
+      <div id="tarifs-list" class="mt12"></div>
     </div>
 
     <!-- Tab Documents -->
