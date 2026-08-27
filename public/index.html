@@ -31,7 +31,7 @@
       <span class="nav-icon">👤</span><span>Agents</span>
     </a>
     <a class="nav-item" data-tab="carte" onclick="showTab('carte')">
-      <span class="nav-icon">🗺️</span><span>Carte des sites</span>
+      <span class="nav-icon">🗺️</span><span>Carte des clients</span>
     </a>
   </nav>
   <div class="sidebar-footer">
@@ -127,9 +127,9 @@
 
   <!-- ═══════════════════ CARTE DES SITES ═══════════════════ -->
   <section id="tab-carte" class="tab-section">
-    <div class="page-header"><h1>Carte des sites clients</h1></div>
+    <div class="page-header"><h1>Carte des clients</h1></div>
     <div class="card">
-      <div id="carte-sites-map" style="height:520px;border-radius:var(--radius);overflow:hidden"></div>
+      <div id="carte-clients-map" style="height:520px;border-radius:var(--radius);overflow:hidden"></div>
     </div>
   </section>
 
@@ -147,6 +147,7 @@
 
     <div class="modal-tabs">
       <button class="modal-tab active" onclick="switchModalTab('infos',this)">📋 Informations</button>
+      <button class="modal-tab" onclick="switchModalTab('contacts',this)">📇 Contacts</button>
       <button class="modal-tab" onclick="switchModalTab('sites',this)">📍 Sites & Agents</button>
       <button class="modal-tab" onclick="switchModalTab('documents',this)">📄 Documents</button>
       <button class="modal-tab" onclick="switchModalTab('historique',this)">📝 Historique</button>
@@ -289,6 +290,18 @@
           <textarea id="f-notes" rows="3" placeholder="Informations complémentaires…"></textarea>
         </div>
       </form>
+    </div>
+
+    <!-- Tab Contacts -->
+    <div id="mtab-contacts" class="modal-tab-content">
+      <div class="activite-add">
+        <input type="text" id="new-contact-nom" placeholder="Nom Prénom…" class="search-input">
+        <input type="text" id="new-contact-poste" placeholder="Poste…" class="filter-select" style="max-width:140px">
+        <input type="tel" id="new-contact-telephone" placeholder="Téléphone…" class="filter-select" style="max-width:150px">
+        <input type="email" id="new-contact-email" placeholder="Email…" class="search-input">
+        <button class="btn-primary" onclick="addContact()">Ajouter</button>
+      </div>
+      <div id="contacts-list" class="mt12"></div>
     </div>
 
     <!-- Tab Sites & Agents -->

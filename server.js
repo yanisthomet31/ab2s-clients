@@ -62,6 +62,7 @@ async function initDB() {
       code_client TEXT,
       contact_nom TEXT, contact_telephone TEXT, contact_email TEXT,
       adresse TEXT, ville TEXT,
+      latitude NUMERIC, longitude NUMERIC,
       siret TEXT, tva TEXT, capital_social TEXT, site_web TEXT,
       type_prestation TEXT,
       categorie_client TEXT,
@@ -83,6 +84,8 @@ async function initDB() {
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS tva TEXT;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS capital_social TEXT;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS site_web TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS longitude NUMERIC;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_contenu BYTEA;
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_mime_type TEXT;
     CREATE TABLE IF NOT EXISTS client_sites (
@@ -96,6 +99,13 @@ async function initDB() {
     );
     ALTER TABLE client_sites ADD COLUMN IF NOT EXISTS latitude NUMERIC;
     ALTER TABLE client_sites ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+    CREATE TABLE IF NOT EXISTS client_contacts (
+      id SERIAL PRIMARY KEY,
+      client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+      nom TEXT NOT NULL,
+      poste TEXT, telephone TEXT, email TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
     ALTER TABLE client_sites ADD COLUMN IF NOT EXISTS code_site TEXT;
     CREATE TABLE IF NOT EXISTS agents (
       id SERIAL PRIMARY KEY,
@@ -198,7 +208,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ─── Routes Clients ────────────────────────────────────
 // Colonnes sans le logo (BYTEA) — évite de le charger inutilement dans les listes
 const CLIENT_COLUMNS = `id, societe, code_client, contact_nom, contact_telephone, contact_email,
-  adresse, ville, siret, tva, capital_social, site_web, type_prestation, categorie_client, type_client,
+  adresse, ville, latitude, longitude, siret, tva, capital_social, site_web, type_prestation, categorie_client, type_client,
   date_debut_contrat, date_fin_contrat, tacite_reconduction, tarif, tarif_unite, statut, notes,
   logo_mime_type, created_at, updated_at`;
 
@@ -227,11 +237,12 @@ app.get('/api/clients/check-doublon', async (req, res) => {
 
 app.get('/api/clients/:id', async (req, res) => {
   const id = req.params.id;
-  const [clientR, sitesR, docsR, histR] = await Promise.all([
+  const [clientR, sitesR, docsR, histR, contactsR] = await Promise.all([
     query(`SELECT ${CLIENT_COLUMNS} FROM clients WHERE id=$1`, [id]),
     query('SELECT * FROM client_sites WHERE client_id=$1 ORDER BY created_at', [id]),
     query('SELECT id, client_id, type, nom_fichier, mime_type, taille_octets, uploaded_by, uploaded_at FROM client_documents WHERE client_id=$1 ORDER BY uploaded_at DESC', [id]),
-    query('SELECT * FROM client_historique WHERE client_id=$1 ORDER BY date DESC', [id])
+    query('SELECT * FROM client_historique WHERE client_id=$1 ORDER BY date DESC', [id]),
+    query('SELECT * FROM client_contacts WHERE client_id=$1 ORDER BY created_at', [id])
   ]);
   if (!clientR.rows[0]) return res.status(404).json({ error: 'Introuvable' });
 
@@ -243,17 +254,18 @@ app.get('/api/clients/:id', async (req, res) => {
     site.agents = rows;
   }
 
-  res.json({ ...clientR.rows[0], sites, documents: docsR.rows, historique: histR.rows });
+  res.json({ ...clientR.rows[0], sites, documents: docsR.rows, historique: histR.rows, contacts: contactsR.rows });
 });
 
 app.post('/api/clients', async (req, res) => {
   const f = req.body;
+  const { latitude, longitude } = await geocodeAdresse([f.adresse, f.ville].filter(Boolean).join(' '));
   const { rows } = await query(
-    `INSERT INTO clients (societe,code_client,contact_nom,contact_telephone,contact_email,adresse,ville,
+    `INSERT INTO clients (societe,code_client,contact_nom,contact_telephone,contact_email,adresse,ville,latitude,longitude,
        siret,tva,capital_social,site_web,type_prestation,
        categorie_client,type_client,date_debut_contrat,date_fin_contrat,tacite_reconduction,tarif,tarif_unite,statut,notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21) RETURNING id`,
-    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23) RETURNING id`,
+    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, latitude, longitude,
      f.siret, f.tva, f.capital_social, f.site_web, f.type_prestation,
      f.categorie_client, f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
      !!f.tacite_reconduction, parseFloat(f.tarif) || 0, f.tarif_unite || 'mensuel', f.statut || 'Actif', f.notes]);
@@ -262,12 +274,13 @@ app.post('/api/clients', async (req, res) => {
 
 app.put('/api/clients/:id', async (req, res) => {
   const f = req.body;
+  const { latitude, longitude } = await geocodeAdresse([f.adresse, f.ville].filter(Boolean).join(' '));
   await query(
     `UPDATE clients SET societe=$1,code_client=$2,contact_nom=$3,contact_telephone=$4,contact_email=$5,adresse=$6,ville=$7,
-       siret=$8,tva=$9,capital_social=$10,site_web=$11,type_prestation=$12,
-       categorie_client=$13,type_client=$14,date_debut_contrat=$15,date_fin_contrat=$16,tacite_reconduction=$17,
-       tarif=$18,tarif_unite=$19,statut=$20,notes=$21,updated_at=NOW() WHERE id=$22`,
-    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville,
+       latitude=$8,longitude=$9,siret=$10,tva=$11,capital_social=$12,site_web=$13,type_prestation=$14,
+       categorie_client=$15,type_client=$16,date_debut_contrat=$17,date_fin_contrat=$18,tacite_reconduction=$19,
+       tarif=$20,tarif_unite=$21,statut=$22,notes=$23,updated_at=NOW() WHERE id=$24`,
+    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, latitude, longitude,
      f.siret, f.tva, f.capital_social, f.site_web, f.type_prestation,
      f.categorie_client, f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
      !!f.tacite_reconduction, parseFloat(f.tarif) || 0, f.tarif_unite, f.statut, f.notes, req.params.id]);
@@ -299,6 +312,25 @@ app.delete('/api/clients/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ─── Routes Contacts ────────────────────────────────────
+app.get('/api/clients/:clientId/contacts', async (req, res) => {
+  const { rows } = await query('SELECT * FROM client_contacts WHERE client_id=$1 ORDER BY created_at', [req.params.clientId]);
+  res.json(rows);
+});
+
+app.post('/api/clients/:clientId/contacts', async (req, res) => {
+  const { nom, poste, telephone, email } = req.body;
+  const { rows } = await query(
+    'INSERT INTO client_contacts (client_id,nom,poste,telephone,email) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+    [req.params.clientId, nom, poste, telephone, email]);
+  res.json({ id: rows[0].id });
+});
+
+app.delete('/api/contacts/:id', async (req, res) => {
+  await query('DELETE FROM client_contacts WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
 // ─── Routes Sites ───────────────────────────────────────
 app.get('/api/clients/:clientId/sites', async (req, res) => {
   const { rows } = await query('SELECT * FROM client_sites WHERE client_id=$1 ORDER BY created_at', [req.params.clientId]);
@@ -322,11 +354,10 @@ app.put('/api/sites/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/sites-map', async (req, res) => {
+app.get('/api/clients-map', async (req, res) => {
   const { rows } = await query(`
-    SELECT s.id, s.nom_site, s.adresse_site, s.latitude, s.longitude, c.id AS client_id, c.societe, c.type_client
-    FROM client_sites s JOIN clients c ON c.id = s.client_id
-    WHERE s.latitude IS NOT NULL AND s.longitude IS NOT NULL`);
+    SELECT id, societe, code_client, adresse, ville, latitude, longitude, type_client, categorie_client
+    FROM clients WHERE latitude IS NOT NULL AND longitude IS NOT NULL`);
   res.json(rows);
 });
 

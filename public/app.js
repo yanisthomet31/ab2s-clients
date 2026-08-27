@@ -49,7 +49,7 @@ function showTab(name) {
   if (name === 'dashboard') loadDashboard();
   if (name === 'clients')   loadClients();
   if (name === 'agents')    renderAgentsTab();
-  if (name === 'carte')     loadCarteSites();
+  if (name === 'carte')     loadCarteClients();
 }
 
 // ─── API helper ───────────────────────────────────────
@@ -162,6 +162,7 @@ async function openClientModal(id = null) {
     renderSites(data.sites || []);
     renderDocuments(data.documents || []);
     renderHistorique(data.historique || []);
+    renderContacts(data.contacts || []);
     showClientLogoPreview(data.logo_mime_type ? id : null);
   } else {
     document.getElementById('modal-title').textContent = 'Nouveau client';
@@ -175,6 +176,7 @@ async function openClientModal(id = null) {
     document.getElementById('sites-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des sites</div>';
     document.getElementById('documents-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des documents</div>';
     document.getElementById('historique-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter un historique</div>';
+    document.getElementById('contacts-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des contacts</div>';
   }
 }
 
@@ -298,6 +300,53 @@ async function deleteClient() {
   closeClientModal();
   loadClients();
   loadDashboard();
+}
+
+// ─── CONTACTS (dans le modal) ──────────────────────────
+function renderContacts(contacts) {
+  const el = document.getElementById('contacts-list');
+  if (!contacts.length) { el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:24px">Aucun contact enregistré</div>'; return; }
+  el.innerHTML = contacts.map(c => `
+    <div class="activite-item">
+      <div class="activite-body">
+        <div class="activite-top">
+          <span class="activite-type">${c.nom}</span>
+          ${c.poste ? `<span class="activite-auteur">— ${c.poste}</span>` : ''}
+        </div>
+        <div class="activite-desc">
+          ${c.telephone ? `<a href="tel:${c.telephone}" style="color:var(--blue);text-decoration:none">📞 ${c.telephone}</a>` : ''}
+          ${c.telephone && c.email ? ' · ' : ''}
+          ${c.email ? `<a href="mailto:${c.email}" style="color:var(--blue);text-decoration:none">✉️ ${c.email}</a>` : ''}
+          ${!c.telephone && !c.email ? '—' : ''}
+        </div>
+      </div>
+      <span class="activite-del" onclick="deleteContact(${c.id})">✕</span>
+    </div>
+  `).join('');
+}
+
+async function addContact() {
+  if (!currentClientId) { toast('Enregistrez d\'abord le client', true); return; }
+  const nom = document.getElementById('new-contact-nom').value.trim();
+  const poste = document.getElementById('new-contact-poste').value.trim();
+  const telephone = document.getElementById('new-contact-telephone').value.trim();
+  const email = document.getElementById('new-contact-email').value.trim();
+  if (!nom) { toast('Nom du contact requis', true); return; }
+  await api(`/api/clients/${currentClientId}/contacts`, { method: 'POST', body: { nom, poste, telephone, email } });
+  document.getElementById('new-contact-nom').value = '';
+  document.getElementById('new-contact-poste').value = '';
+  document.getElementById('new-contact-telephone').value = '';
+  document.getElementById('new-contact-email').value = '';
+  const data = await api(`/api/clients/${currentClientId}`);
+  renderContacts(data.contacts || []);
+  toast('Contact ajouté ✔');
+}
+
+async function deleteContact(id) {
+  if (!confirm('Supprimer ce contact ?')) return;
+  await api(`/api/contacts/${id}`, { method: 'DELETE' });
+  const data = await api(`/api/clients/${currentClientId}`);
+  renderContacts(data.contacts || []);
 }
 
 // ─── SITES & AGENTS (dans le modal) ───────────────────
@@ -490,40 +539,41 @@ async function deleteHistorique(id) {
   renderHistorique(data.historique || []);
 }
 
-// ─── CARTE DES SITES ───────────────────────────────────
-let carteSitesMap = null;
-let carteSitesMarkers = [];
-async function loadCarteSites() {
+// ─── CARTE DES CLIENTS ──────────────────────────────────
+let carteClientsMap = null;
+let carteClientsMarkers = [];
+async function loadCarteClients() {
   if (typeof L === 'undefined') return;
-  const sites = await api('/api/sites-map') || [];
+  const clients = await api('/api/clients-map') || [];
 
-  if (!carteSitesMap) {
-    carteSitesMap = L.map('carte-sites-map').setView([46.6, 2.5], 6);
+  if (!carteClientsMap) {
+    carteClientsMap = L.map('carte-clients-map').setView([46.6, 2.5], 6);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap',
       maxZoom: 18
-    }).addTo(carteSitesMap);
+    }).addTo(carteClientsMap);
   }
 
-  carteSitesMarkers.forEach(m => carteSitesMap.removeLayer(m));
-  carteSitesMarkers = [];
+  carteClientsMarkers.forEach(m => carteClientsMap.removeLayer(m));
+  carteClientsMarkers = [];
 
-  sites.forEach(s => {
-    const color = s.type_client === 'Occasionnel' ? '#F57C00' : '#1565C0';
-    const marker = L.circleMarker([s.latitude, s.longitude], {
+  clients.forEach(c => {
+    const color = c.type_client === 'Occasionnel' ? '#F57C00' : '#1565C0';
+    const marker = L.circleMarker([c.latitude, c.longitude], {
       radius: 7, color, fillColor: color, fillOpacity: 0.85, weight: 2
-    }).addTo(carteSitesMap);
+    }).addTo(carteClientsMap);
     marker.bindPopup(`
-      <strong>${s.societe}</strong><br>
-      ${s.nom_site}<br>
-      ${s.adresse_site || ''}<br>
-      <em>${s.type_client === 'Occasionnel' ? '📋 Occasionnel' : '🔒 Régulier'}</em><br>
-      <a href="#" onclick="showTab('clients');openClientModal(${s.client_id});return false;">Ouvrir la fiche →</a>
+      <strong>${c.societe}</strong><br>
+      ${c.code_client ? `Code : ${c.code_client}<br>` : ''}
+      ${[c.adresse, c.ville].filter(Boolean).join(', ') || ''}<br>
+      ${c.categorie_client ? `<em>${c.categorie_client}</em><br>` : ''}
+      <em>${c.type_client === 'Occasionnel' ? '📋 Occasionnel' : '🔒 Régulier'}</em><br>
+      <a href="#" onclick="openClientModal(${c.id});return false;">Ouvrir la fiche →</a>
     `);
-    carteSitesMarkers.push(marker);
+    carteClientsMarkers.push(marker);
   });
 
-  setTimeout(() => carteSitesMap.invalidateSize(), 100);
+  setTimeout(() => carteClientsMap.invalidateSize(), 100);
 }
 
 // ─── UTILS ────────────────────────────────────────────
