@@ -64,6 +64,7 @@ async function initDB() {
       type_prestation TEXT,
       type_client TEXT DEFAULT 'Régulier',
       date_debut_contrat DATE, date_fin_contrat DATE,
+      tacite_reconduction BOOLEAN DEFAULT FALSE,
       tarif NUMERIC DEFAULT 0, tarif_unite TEXT DEFAULT 'mensuel',
       statut TEXT DEFAULT 'Actif',
       notes TEXT,
@@ -71,16 +72,19 @@ async function initDB() {
       updated_at TIMESTAMP DEFAULT NOW()
     );
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS type_client TEXT DEFAULT 'Régulier';
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS tacite_reconduction BOOLEAN DEFAULT FALSE;
     CREATE TABLE IF NOT EXISTS client_sites (
       id SERIAL PRIMARY KEY,
       client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
       nom_site TEXT NOT NULL,
       adresse_site TEXT,
+      code_site TEXT,
       latitude NUMERIC, longitude NUMERIC,
       created_at TIMESTAMP DEFAULT NOW()
     );
     ALTER TABLE client_sites ADD COLUMN IF NOT EXISTS latitude NUMERIC;
     ALTER TABLE client_sites ADD COLUMN IF NOT EXISTS longitude NUMERIC;
+    ALTER TABLE client_sites ADD COLUMN IF NOT EXISTS code_site TEXT;
     CREATE TABLE IF NOT EXISTS agents (
       id SERIAL PRIMARY KEY,
       nom TEXT UNIQUE NOT NULL,
@@ -228,11 +232,11 @@ app.post('/api/clients', async (req, res) => {
   const f = req.body;
   const { rows } = await query(
     `INSERT INTO clients (societe,contact_nom,contact_telephone,contact_email,adresse,ville,type_prestation,
-       type_client,date_debut_contrat,date_fin_contrat,tarif,tarif_unite,statut,notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+       type_client,date_debut_contrat,date_fin_contrat,tacite_reconduction,tarif,tarif_unite,statut,notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
     [f.societe, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
-     f.type_client || 'Régulier', f.date_debut_contrat || null, f.date_fin_contrat || null, parseFloat(f.tarif) || 0,
-     f.tarif_unite || 'mensuel', f.statut || 'Actif', f.notes]);
+     f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
+     !!f.tacite_reconduction, parseFloat(f.tarif) || 0, f.tarif_unite || 'mensuel', f.statut || 'Actif', f.notes]);
   res.json({ id: rows[0].id });
 });
 
@@ -240,11 +244,11 @@ app.put('/api/clients/:id', async (req, res) => {
   const f = req.body;
   await query(
     `UPDATE clients SET societe=$1,contact_nom=$2,contact_telephone=$3,contact_email=$4,adresse=$5,ville=$6,
-       type_prestation=$7,type_client=$8,date_debut_contrat=$9,date_fin_contrat=$10,tarif=$11,tarif_unite=$12,statut=$13,
-       notes=$14,updated_at=NOW() WHERE id=$15`,
+       type_prestation=$7,type_client=$8,date_debut_contrat=$9,date_fin_contrat=$10,tacite_reconduction=$11,
+       tarif=$12,tarif_unite=$13,statut=$14,notes=$15,updated_at=NOW() WHERE id=$16`,
     [f.societe, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
-     f.type_client || 'Régulier', f.date_debut_contrat || null, f.date_fin_contrat || null, parseFloat(f.tarif) || 0,
-     f.tarif_unite, f.statut, f.notes, req.params.id]);
+     f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
+     !!f.tacite_reconduction, parseFloat(f.tarif) || 0, f.tarif_unite, f.statut, f.notes, req.params.id]);
   res.json({ ok: true });
 });
 
@@ -260,19 +264,19 @@ app.get('/api/clients/:clientId/sites', async (req, res) => {
 });
 
 app.post('/api/clients/:clientId/sites', async (req, res) => {
-  const { nom_site, adresse_site } = req.body;
+  const { nom_site, adresse_site, code_site } = req.body;
   const { latitude, longitude } = await geocodeAdresse(adresse_site);
   const { rows } = await query(
-    'INSERT INTO client_sites (client_id,nom_site,adresse_site,latitude,longitude) VALUES ($1,$2,$3,$4,$5) RETURNING id',
-    [req.params.clientId, nom_site, adresse_site, latitude, longitude]);
+    'INSERT INTO client_sites (client_id,nom_site,adresse_site,code_site,latitude,longitude) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id',
+    [req.params.clientId, nom_site, adresse_site, code_site, latitude, longitude]);
   res.json({ id: rows[0].id });
 });
 
 app.put('/api/sites/:id', async (req, res) => {
-  const { nom_site, adresse_site } = req.body;
+  const { nom_site, adresse_site, code_site } = req.body;
   const { latitude, longitude } = await geocodeAdresse(adresse_site);
-  await query('UPDATE client_sites SET nom_site=$1, adresse_site=$2, latitude=$3, longitude=$4 WHERE id=$5',
-    [nom_site, adresse_site, latitude, longitude, req.params.id]);
+  await query('UPDATE client_sites SET nom_site=$1, adresse_site=$2, code_site=$3, latitude=$4, longitude=$5 WHERE id=$6',
+    [nom_site, adresse_site, code_site, latitude, longitude, req.params.id]);
   res.json({ ok: true });
 });
 

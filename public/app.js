@@ -116,7 +116,7 @@ async function loadClients() {
       <td>${c.ville || '—'}</td>
       <td>${c.type_prestation || '—'}</td>
       <td><span class="etape-badge etape-${c.statut === 'Actif' ? 'Gagné' : c.statut === 'Suspendu' ? 'Négociation' : 'Perdu'}">${c.statut}</span></td>
-      <td>${c.date_fin_contrat ? formatDateShort(c.date_fin_contrat) : '—'}</td>
+      <td>${c.tacite_reconduction ? '🔄 Tacite reconduction' : (c.date_fin_contrat ? formatDateShort(c.date_fin_contrat) : '—')}</td>
     </tr>
   `).join('');
 }
@@ -144,6 +144,8 @@ async function openClientModal(id = null) {
     document.getElementById('f-contact-email').value     = data.contact_email || '';
     document.getElementById('f-date-debut').value        = data.date_debut_contrat ? data.date_debut_contrat.slice(0,10) : '';
     document.getElementById('f-date-fin').value          = data.date_fin_contrat ? data.date_fin_contrat.slice(0,10) : '';
+    document.getElementById('f-tacite-reconduction').checked = !!data.tacite_reconduction;
+    toggleTaciteReconduction();
     document.getElementById('f-statut').value            = data.statut || 'Actif';
     document.getElementById('f-tarif').value             = data.tarif || '';
     document.getElementById('f-tarif-unite').value       = data.tarif_unite || 'mensuel';
@@ -158,10 +160,18 @@ async function openClientModal(id = null) {
     document.getElementById('f-id').value = '';
     document.getElementById('f-statut').value = 'Actif';
     document.getElementById('f-type-client').value = 'Régulier';
+    toggleTaciteReconduction();
     document.getElementById('sites-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des sites</div>';
     document.getElementById('documents-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des documents</div>';
     document.getElementById('historique-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter un historique</div>';
   }
+}
+
+function toggleTaciteReconduction() {
+  const checked = document.getElementById('f-tacite-reconduction').checked;
+  const dateFin = document.getElementById('f-date-fin');
+  dateFin.disabled = checked;
+  if (checked) dateFin.value = '';
 }
 
 function closeClientModal() {
@@ -193,6 +203,7 @@ async function saveClient() {
     contact_email:      document.getElementById('f-contact-email').value.trim(),
     date_debut_contrat: document.getElementById('f-date-debut').value || null,
     date_fin_contrat:   document.getElementById('f-date-fin').value || null,
+    tacite_reconduction: document.getElementById('f-tacite-reconduction').checked,
     statut:             document.getElementById('f-statut').value,
     tarif:              parseFloat(document.getElementById('f-tarif').value) || 0,
     tarif_unite:        document.getElementById('f-tarif-unite').value,
@@ -246,6 +257,7 @@ function renderSites(sites) {
       <div class="activite-body" style="width:100%">
         <div class="activite-top">
           <span class="activite-type">${s.nom_site}</span>
+          ${s.code_site ? `<span class="segment-badge">${s.code_site}</span>` : ''}
           <span class="activite-auteur">${s.adresse_site || ''}</span>
         </div>
         <div class="activite-desc" style="margin-top:8px">
@@ -268,10 +280,12 @@ function renderSites(sites) {
 async function addSite() {
   if (!currentClientId) { toast('Enregistrez d\'abord le client', true); return; }
   const nom_site = document.getElementById('new-site-nom').value.trim();
+  const code_site = document.getElementById('new-site-code').value.trim();
   const adresse_site = document.getElementById('new-site-adresse').value.trim();
   if (!nom_site) { toast('Nom du site requis', true); return; }
-  await api(`/api/clients/${currentClientId}/sites`, { method: 'POST', body: { nom_site, adresse_site } });
+  await api(`/api/clients/${currentClientId}/sites`, { method: 'POST', body: { nom_site, code_site, adresse_site } });
   document.getElementById('new-site-nom').value = '';
+  document.getElementById('new-site-code').value = '';
   document.getElementById('new-site-adresse').value = '';
   const data = await api(`/api/clients/${currentClientId}`);
   renderSites(data.sites || []);

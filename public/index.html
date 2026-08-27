@@ -214,6 +214,10 @@
           <div class="form-group flex-1">
             <label>Fin de contrat</label>
             <input type="date" id="f-date-fin">
+            <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:400;font-size:12.5px">
+              <input type="checkbox" id="f-tacite-reconduction" onchange="toggleTaciteReconduction()" style="width:auto">
+              Tacite reconduction (pas de date de fin)
+            </label>
           </div>
           <div class="form-group flex-1">
             <label>Statut</label>
@@ -246,6 +250,7 @@
     <div id="mtab-sites" class="modal-tab-content">
       <div class="activite-add">
         <input type="text" id="new-site-nom" placeholder="Nom du site…" class="search-input">
+        <input type="text" id="new-site-code" placeholder="Code site…" class="filter-select" style="max-width:140px">
         <input type="text" id="new-site-adresse" placeholder="Adresse du site…" class="search-input">
         <button class="btn-primary" onclick="addSite()">Ajouter le site</button>
       </div>
