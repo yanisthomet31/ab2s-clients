@@ -23,6 +23,22 @@ async function logout() {
   window.location.href = '/login.html';
 }
 
+async function changePassword() {
+  const ancien = prompt('Ancien mot de passe :');
+  if (!ancien) return;
+  const nouveau = prompt('Nouveau mot de passe (6 caractères minimum) :');
+  if (!nouveau) return;
+  const confirmation = prompt('Confirmez le nouveau mot de passe :');
+  if (nouveau !== confirmation) { toast('Les mots de passe ne correspondent pas', true); return; }
+  const r = await api('/api/change-password', { method: 'POST', body: { ancien, nouveau } });
+  if (r && r.ok) toast('Mot de passe changé ✔');
+  else toast((r && r.error) || 'Erreur', true);
+}
+
+function exportCSV() {
+  window.open(API + '/api/export/csv', '_blank');
+}
+
 // ─── Navigation ───────────────────────────────────────
 function showTab(name) {
   document.querySelectorAll('.tab-section').forEach(s => s.classList.remove('active'));
@@ -33,6 +49,7 @@ function showTab(name) {
   if (name === 'dashboard') loadDashboard();
   if (name === 'clients')   loadClients();
   if (name === 'agents')    renderAgentsTab();
+  if (name === 'carte')     loadCarteSites();
 }
 
 // ─── API helper ───────────────────────────────────────
@@ -63,10 +80,20 @@ async function loadDashboard() {
 }
 
 // ─── CLIENTS ──────────────────────────────────────────
+let currentTypeClientFilter = '';
+function filterClientsType(type) {
+  currentTypeClientFilter = type;
+  document.getElementById('client-type-tous').classList.toggle('active', type === '');
+  document.getElementById('client-type-regulier').classList.toggle('active', type === 'Régulier');
+  document.getElementById('client-type-occasionnel').classList.toggle('active', type === 'Occasionnel');
+  loadClients();
+}
+
 async function loadClients() {
   const params = new URLSearchParams();
   const s = document.getElementById('search-input').value;
   if (s) params.set('search', s);
+  if (currentTypeClientFilter) params.set('type_client', currentTypeClientFilter);
 
   const data = await api('/api/clients?' + params);
   if (!data) return;
@@ -84,6 +111,7 @@ async function loadClients() {
   tbody.innerHTML = data.map(c => `
     <tr onclick="openClientModal(${c.id})">
       <td><strong>${c.societe}</strong></td>
+      <td><span class="segment-badge">${c.type_client === 'Occasionnel' ? '📋 Occasionnel' : '🔒 Régulier'}</span></td>
       <td>${c.contact_nom || '—'}</td>
       <td>${c.ville || '—'}</td>
       <td>${c.type_prestation || '—'}</td>
@@ -108,6 +136,7 @@ async function openClientModal(id = null) {
     document.getElementById('f-id').value               = data.id;
     document.getElementById('f-societe').value          = data.societe || '';
     document.getElementById('f-type-prestation').value   = data.type_prestation || 'Gardiennage';
+    document.getElementById('f-type-client').value        = data.type_client || 'Régulier';
     document.getElementById('f-adresse').value           = data.adresse || '';
     document.getElementById('f-ville').value             = data.ville || '';
     document.getElementById('f-contact-nom').value       = data.contact_nom || '';
@@ -128,6 +157,7 @@ async function openClientModal(id = null) {
     document.getElementById('client-form').reset();
     document.getElementById('f-id').value = '';
     document.getElementById('f-statut').value = 'Actif';
+    document.getElementById('f-type-client').value = 'Régulier';
     document.getElementById('sites-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des sites</div>';
     document.getElementById('documents-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des documents</div>';
     document.getElementById('historique-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter un historique</div>';
@@ -155,6 +185,7 @@ async function saveClient() {
   const body = {
     societe:            document.getElementById('f-societe').value.trim(),
     type_prestation:    document.getElementById('f-type-prestation').value,
+    type_client:        document.getElementById('f-type-client').value,
     adresse:            document.getElementById('f-adresse').value.trim(),
     ville:              document.getElementById('f-ville').value.trim(),
     contact_nom:        document.getElementById('f-contact-nom').value.trim(),
@@ -168,6 +199,12 @@ async function saveClient() {
     notes:              document.getElementById('f-notes').value.trim(),
   };
   if (!body.societe) { toast('Le nom de la société est obligatoire', true); return; }
+
+  const dup = await api(`/api/clients/check-doublon?societe=${encodeURIComponent(body.societe)}${currentClientId ? '&exclude_id=' + currentClientId : ''}`);
+  if (dup && dup.existe) {
+    const noms = dup.correspondances.map(c => c.societe).join(', ');
+    if (!confirm(`Une entreprise similaire existe déjà (${noms}). Créer/enregistrer quand même ?`)) return;
+  }
 
   if (currentClientId) {
     await api(`/api/clients/${currentClientId}`, { method: 'PUT', body });
@@ -382,6 +419,42 @@ async function deleteHistorique(id) {
   await api(`/api/historique/${id}`, { method: 'DELETE' });
   const data = await api(`/api/clients/${currentClientId}`);
   renderHistorique(data.historique || []);
+}
+
+// ─── CARTE DES SITES ───────────────────────────────────
+let carteSitesMap = null;
+let carteSitesMarkers = [];
+async function loadCarteSites() {
+  if (typeof L === 'undefined') return;
+  const sites = await api('/api/sites-map') || [];
+
+  if (!carteSitesMap) {
+    carteSitesMap = L.map('carte-sites-map').setView([46.6, 2.5], 6);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap',
+      maxZoom: 18
+    }).addTo(carteSitesMap);
+  }
+
+  carteSitesMarkers.forEach(m => carteSitesMap.removeLayer(m));
+  carteSitesMarkers = [];
+
+  sites.forEach(s => {
+    const color = s.type_client === 'Occasionnel' ? '#F57C00' : '#1565C0';
+    const marker = L.circleMarker([s.latitude, s.longitude], {
+      radius: 7, color, fillColor: color, fillOpacity: 0.85, weight: 2
+    }).addTo(carteSitesMap);
+    marker.bindPopup(`
+      <strong>${s.societe}</strong><br>
+      ${s.nom_site}<br>
+      ${s.adresse_site || ''}<br>
+      <em>${s.type_client === 'Occasionnel' ? '📋 Occasionnel' : '🔒 Régulier'}</em><br>
+      <a href="#" onclick="showTab('clients');openClientModal(${s.client_id});return false;">Ouvrir la fiche →</a>
+    `);
+    carteSitesMarkers.push(marker);
+  });
+
+  setTimeout(() => carteSitesMap.invalidateSize(), 100);
 }
 
 // ─── UTILS ────────────────────────────────────────────

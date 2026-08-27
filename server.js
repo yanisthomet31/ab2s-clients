@@ -31,6 +31,22 @@ async function query(text, params) {
   finally { client.release(); }
 }
 
+// Géocodage gratuit (API officielle française, pas de clé nécessaire)
+async function geocodeAdresse(adresse) {
+  if (!adresse) return { latitude: null, longitude: null };
+  try {
+    const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(adresse)}&limit=1`);
+    if (!r.ok) return { latitude: null, longitude: null };
+    const data = await r.json();
+    const coords = data.features?.[0]?.geometry?.coordinates;
+    if (!coords) return { latitude: null, longitude: null };
+    return { latitude: coords[1], longitude: coords[0] };
+  } catch (e) {
+    console.error('❌ Erreur géocodage:', e.message);
+    return { latitude: null, longitude: null };
+  }
+}
+
 async function initDB() {
   await query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -46,6 +62,7 @@ async function initDB() {
       contact_nom TEXT, contact_telephone TEXT, contact_email TEXT,
       adresse TEXT, ville TEXT,
       type_prestation TEXT,
+      type_client TEXT DEFAULT 'Régulier',
       date_debut_contrat DATE, date_fin_contrat DATE,
       tarif NUMERIC DEFAULT 0, tarif_unite TEXT DEFAULT 'mensuel',
       statut TEXT DEFAULT 'Actif',
@@ -53,13 +70,17 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS type_client TEXT DEFAULT 'Régulier';
     CREATE TABLE IF NOT EXISTS client_sites (
       id SERIAL PRIMARY KEY,
       client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
       nom_site TEXT NOT NULL,
       adresse_site TEXT,
+      latitude NUMERIC, longitude NUMERIC,
       created_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE client_sites ADD COLUMN IF NOT EXISTS latitude NUMERIC;
+    ALTER TABLE client_sites ADD COLUMN IF NOT EXISTS longitude NUMERIC;
     CREATE TABLE IF NOT EXISTS agents (
       id SERIAL PRIMARY KEY,
       nom TEXT UNIQUE NOT NULL,
@@ -160,16 +181,26 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Routes Clients ────────────────────────────────────
 app.get('/api/clients', async (req, res) => {
-  const { search } = req.query;
+  const { search, type_client } = req.query;
   let text = 'SELECT * FROM clients WHERE 1=1';
   const params = [];
   if (search) {
     params.push(`%${search}%`);
     text += ` AND (societe ILIKE $${params.length} OR contact_nom ILIKE $${params.length} OR ville ILIKE $${params.length})`;
   }
+  if (type_client) { params.push(type_client); text += ` AND type_client = $${params.length}`; }
   text += ' ORDER BY updated_at DESC';
   const { rows } = await query(text, params);
   res.json(rows);
+});
+
+app.get('/api/clients/check-doublon', async (req, res) => {
+  const societe = (req.query.societe || '').trim();
+  if (!societe) return res.json({ existe: false });
+  const { rows } = await query(
+    'SELECT id, societe FROM clients WHERE societe ILIKE $1 AND id != COALESCE($2::int, -1)',
+    [`%${societe}%`, req.query.exclude_id || null]);
+  res.json({ existe: rows.length > 0, correspondances: rows });
 });
 
 app.get('/api/clients/:id', async (req, res) => {
@@ -197,10 +228,10 @@ app.post('/api/clients', async (req, res) => {
   const f = req.body;
   const { rows } = await query(
     `INSERT INTO clients (societe,contact_nom,contact_telephone,contact_email,adresse,ville,type_prestation,
-       date_debut_contrat,date_fin_contrat,tarif,tarif_unite,statut,notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13) RETURNING id`,
+       type_client,date_debut_contrat,date_fin_contrat,tarif,tarif_unite,statut,notes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
     [f.societe, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
-     f.date_debut_contrat || null, f.date_fin_contrat || null, parseFloat(f.tarif) || 0,
+     f.type_client || 'Régulier', f.date_debut_contrat || null, f.date_fin_contrat || null, parseFloat(f.tarif) || 0,
      f.tarif_unite || 'mensuel', f.statut || 'Actif', f.notes]);
   res.json({ id: rows[0].id });
 });
@@ -209,10 +240,10 @@ app.put('/api/clients/:id', async (req, res) => {
   const f = req.body;
   await query(
     `UPDATE clients SET societe=$1,contact_nom=$2,contact_telephone=$3,contact_email=$4,adresse=$5,ville=$6,
-       type_prestation=$7,date_debut_contrat=$8,date_fin_contrat=$9,tarif=$10,tarif_unite=$11,statut=$12,
-       notes=$13,updated_at=NOW() WHERE id=$14`,
+       type_prestation=$7,type_client=$8,date_debut_contrat=$9,date_fin_contrat=$10,tarif=$11,tarif_unite=$12,statut=$13,
+       notes=$14,updated_at=NOW() WHERE id=$15`,
     [f.societe, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
-     f.date_debut_contrat || null, f.date_fin_contrat || null, parseFloat(f.tarif) || 0,
+     f.type_client || 'Régulier', f.date_debut_contrat || null, f.date_fin_contrat || null, parseFloat(f.tarif) || 0,
      f.tarif_unite, f.statut, f.notes, req.params.id]);
   res.json({ ok: true });
 });
@@ -230,16 +261,27 @@ app.get('/api/clients/:clientId/sites', async (req, res) => {
 
 app.post('/api/clients/:clientId/sites', async (req, res) => {
   const { nom_site, adresse_site } = req.body;
+  const { latitude, longitude } = await geocodeAdresse(adresse_site);
   const { rows } = await query(
-    'INSERT INTO client_sites (client_id,nom_site,adresse_site) VALUES ($1,$2,$3) RETURNING id',
-    [req.params.clientId, nom_site, adresse_site]);
+    'INSERT INTO client_sites (client_id,nom_site,adresse_site,latitude,longitude) VALUES ($1,$2,$3,$4,$5) RETURNING id',
+    [req.params.clientId, nom_site, adresse_site, latitude, longitude]);
   res.json({ id: rows[0].id });
 });
 
 app.put('/api/sites/:id', async (req, res) => {
   const { nom_site, adresse_site } = req.body;
-  await query('UPDATE client_sites SET nom_site=$1, adresse_site=$2 WHERE id=$3', [nom_site, adresse_site, req.params.id]);
+  const { latitude, longitude } = await geocodeAdresse(adresse_site);
+  await query('UPDATE client_sites SET nom_site=$1, adresse_site=$2, latitude=$3, longitude=$4 WHERE id=$5',
+    [nom_site, adresse_site, latitude, longitude, req.params.id]);
   res.json({ ok: true });
+});
+
+app.get('/api/sites-map', async (req, res) => {
+  const { rows } = await query(`
+    SELECT s.id, s.nom_site, s.adresse_site, s.latitude, s.longitude, c.id AS client_id, c.societe, c.type_client
+    FROM client_sites s JOIN clients c ON c.id = s.client_id
+    WHERE s.latitude IS NOT NULL AND s.longitude IS NOT NULL`);
+  res.json(rows);
 });
 
 app.delete('/api/sites/:id', async (req, res) => {
@@ -347,6 +389,22 @@ app.get('/api/kpi', async (req, res) => {
     documents: parseInt(docsR.rows[0].n),
     echeances_30j: parseInt(echeanceR.rows[0].n)
   });
+});
+
+// ─── Export CSV ───────────────────────────────────────
+app.get('/api/export/csv', async (req, res) => {
+  const { rows } = await query('SELECT * FROM clients ORDER BY societe');
+  const headers = ['ID','Société','Type de client','Contact','Téléphone','Email','Adresse','Ville',
+    'Type de prestation','Début contrat','Fin contrat','Tarif','Unité','Statut','Notes','Créé le','Modifié le'];
+  const csv = [
+    headers.join(';'),
+    ...rows.map(r => [r.id, r.societe, r.type_client, r.contact_nom, r.contact_telephone, r.contact_email,
+      r.adresse, r.ville, r.type_prestation, r.date_debut_contrat, r.date_fin_contrat, r.tarif, r.tarif_unite,
+      r.statut, `"${(r.notes||'').replace(/"/g,'""')}"`, r.created_at, r.updated_at].join(';'))
+  ].join('\n');
+  res.setHeader('Content-Type', 'text/csv;charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment;filename="clients_ab2s.csv"');
+  res.send('﻿' + csv);
 });
 
 // ─── Démarrage ──────────────────────────────────────────

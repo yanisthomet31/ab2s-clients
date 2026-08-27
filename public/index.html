@@ -6,6 +6,8 @@
 <title>AB2S Sécurité — Base de données Clients</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 </head>
 <body>
 
@@ -28,9 +30,14 @@
     <a class="nav-item" data-tab="agents" onclick="showTab('agents')">
       <span class="nav-icon">👤</span><span>Agents</span>
     </a>
+    <a class="nav-item" data-tab="carte" onclick="showTab('carte')">
+      <span class="nav-icon">🗺️</span><span>Carte des sites</span>
+    </a>
   </nav>
   <div class="sidebar-footer">
+    <button class="btn-export" onclick="exportCSV()">⬇ Exporter CSV</button>
     <div class="sidebar-version" id="connected-as">Connecté</div>
+    <button class="btn-export" onclick="changePassword()">🔑 Changer mon mot de passe</button>
     <button class="btn-export" onclick="logout()">🚪 Déconnexion</button>
   </div>
 </aside>
@@ -82,13 +89,18 @@
       </div>
       <button class="btn-primary" onclick="openClientModal()">+ Nouveau client</button>
     </div>
+    <div class="modal-tabs" style="background:none;border-bottom:2px solid var(--border);padding:0 0 0 2px;margin-bottom:12px">
+      <button class="modal-tab active" id="client-type-tous" onclick="filterClientsType('')">Tous</button>
+      <button class="modal-tab" id="client-type-regulier" onclick="filterClientsType('Régulier')">🔒 Réguliers</button>
+      <button class="modal-tab" id="client-type-occasionnel" onclick="filterClientsType('Occasionnel')">📋 Occasionnels</button>
+    </div>
     <div class="filters-bar card">
       <input type="search" id="search-input" placeholder="🔍 Rechercher (société, contact, ville…)" oninput="loadClients()" class="search-input">
     </div>
     <div class="card mt12">
       <table class="table" id="clients-table">
         <thead><tr>
-          <th>Société</th><th>Contact</th><th>Ville</th>
+          <th>Société</th><th>Type</th><th>Contact</th><th>Ville</th>
           <th>Type de prestation</th><th>Statut</th><th>Fin de contrat</th>
         </tr></thead>
         <tbody id="clients-body"></tbody>
@@ -110,6 +122,14 @@
         <button class="btn-primary" onclick="addAgent()">Ajouter</button>
       </div>
       <div id="agents-list" class="mt12"></div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ CARTE DES SITES ═══════════════════ -->
+  <section id="tab-carte" class="tab-section">
+    <div class="page-header"><h1>Carte des sites clients</h1></div>
+    <div class="card">
+      <div id="carte-sites-map" style="height:520px;border-radius:var(--radius);overflow:hidden"></div>
     </div>
   </section>
 
@@ -148,6 +168,13 @@
             <select id="f-type-prestation">
               <option>Gardiennage</option><option>Surveillance événementielle</option>
               <option>Rondes</option><option>Télésurveillance</option><option>Autre</option>
+            </select>
+          </div>
+          <div class="form-group flex-1">
+            <label>Type de client</label>
+            <select id="f-type-client">
+              <option value="Régulier">🔒 Régulier (contrat fixe)</option>
+              <option value="Occasionnel">📋 Occasionnel (sur devis)</option>
             </select>
           </div>
         </div>
