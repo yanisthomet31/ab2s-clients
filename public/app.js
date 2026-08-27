@@ -126,6 +126,7 @@ async function openClientModal(id = null) {
   currentClientId = id;
   document.getElementById('modal-overlay').classList.add('open');
   document.getElementById('btn-delete').style.display = id ? '' : 'none';
+  document.getElementById('btn-fiche-pdf').style.display = id ? '' : 'none';
   switchModalTab('infos', document.querySelector('.modal-tab'));
 
   if (id) {
@@ -135,6 +136,7 @@ async function openClientModal(id = null) {
 
     document.getElementById('f-id').value               = data.id;
     document.getElementById('f-societe').value          = data.societe || '';
+    document.getElementById('f-code-client').value       = data.code_client || '';
     document.getElementById('f-type-prestation').value   = data.type_prestation || 'Gardiennage';
     document.getElementById('f-type-client').value        = data.type_client || 'Régulier';
     document.getElementById('f-adresse').value           = data.adresse || '';
@@ -154,6 +156,7 @@ async function openClientModal(id = null) {
     renderSites(data.sites || []);
     renderDocuments(data.documents || []);
     renderHistorique(data.historique || []);
+    showClientLogoPreview(data.logo_mime_type ? id : null);
   } else {
     document.getElementById('modal-title').textContent = 'Nouveau client';
     document.getElementById('client-form').reset();
@@ -161,10 +164,43 @@ async function openClientModal(id = null) {
     document.getElementById('f-statut').value = 'Actif';
     document.getElementById('f-type-client').value = 'Régulier';
     toggleTaciteReconduction();
+    showClientLogoPreview(null);
     document.getElementById('sites-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des sites</div>';
     document.getElementById('documents-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des documents</div>';
     document.getElementById('historique-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter un historique</div>';
   }
+}
+
+function showClientLogoPreview(clientId) {
+  const img = document.getElementById('client-logo-preview');
+  if (clientId) {
+    img.src = `/api/clients/${clientId}/logo?t=${Date.now()}`;
+    img.style.display = '';
+  } else {
+    img.src = '';
+    img.style.display = 'none';
+  }
+}
+
+async function uploadClientLogoIfSelected() {
+  const fileInput = document.getElementById('f-logo-file');
+  if (!fileInput.files.length) return;
+  if (!currentClientId) { toast('Enregistrez d\'abord le client avant d\'ajouter un logo', true); return; }
+  const formData = new FormData();
+  formData.append('file', fileInput.files[0]);
+  const r = await fetch(`${API}/api/clients/${currentClientId}/logo`, { method: 'POST', body: formData });
+  if (r.status === 401) { window.location.href = '/login.html'; return; }
+  fileInput.value = '';
+  showClientLogoPreview(currentClientId);
+  toast('Logo mis à jour ✔');
+}
+
+async function removeClientLogo() {
+  if (!currentClientId) { document.getElementById('f-logo-file').value = ''; showClientLogoPreview(null); return; }
+  if (!confirm('Supprimer le logo de ce client ?')) return;
+  await api(`/api/clients/${currentClientId}/logo`, { method: 'DELETE' });
+  showClientLogoPreview(null);
+  toast('Logo supprimé');
 }
 
 function toggleTaciteReconduction() {
@@ -194,6 +230,7 @@ function switchModalTab(name, btn) {
 async function saveClient() {
   const body = {
     societe:            document.getElementById('f-societe').value.trim(),
+    code_client:        document.getElementById('f-code-client').value.trim(),
     type_prestation:    document.getElementById('f-type-prestation').value,
     type_client:        document.getElementById('f-type-client').value,
     adresse:            document.getElementById('f-adresse').value.trim(),
@@ -225,6 +262,7 @@ async function saveClient() {
     if (r) {
       currentClientId = r.id;
       document.getElementById('btn-delete').style.display = '';
+      document.getElementById('btn-fiche-pdf').style.display = '';
       document.getElementById('sites-list').innerHTML = '';
       document.getElementById('documents-list').innerHTML = '';
       document.getElementById('historique-list').innerHTML = '';
@@ -234,6 +272,11 @@ async function saveClient() {
   }
   loadClients();
   loadDashboard();
+}
+
+function ouvrirFichePDF() {
+  if (!currentClientId) return;
+  window.open(`/fiche.html?id=${currentClientId}`, '_blank');
 }
 
 async function deleteClient() {

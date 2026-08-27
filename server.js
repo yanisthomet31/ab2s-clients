@@ -59,6 +59,7 @@ async function initDB() {
     CREATE TABLE IF NOT EXISTS clients (
       id SERIAL PRIMARY KEY,
       societe TEXT NOT NULL,
+      code_client TEXT,
       contact_nom TEXT, contact_telephone TEXT, contact_email TEXT,
       adresse TEXT, ville TEXT,
       type_prestation TEXT,
@@ -68,11 +69,15 @@ async function initDB() {
       tarif NUMERIC DEFAULT 0, tarif_unite TEXT DEFAULT 'mensuel',
       statut TEXT DEFAULT 'Actif',
       notes TEXT,
+      logo_contenu BYTEA, logo_mime_type TEXT,
       created_at TIMESTAMP DEFAULT NOW(),
       updated_at TIMESTAMP DEFAULT NOW()
     );
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS type_client TEXT DEFAULT 'Régulier';
     ALTER TABLE clients ADD COLUMN IF NOT EXISTS tacite_reconduction BOOLEAN DEFAULT FALSE;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS code_client TEXT;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_contenu BYTEA;
+    ALTER TABLE clients ADD COLUMN IF NOT EXISTS logo_mime_type TEXT;
     CREATE TABLE IF NOT EXISTS client_sites (
       id SERIAL PRIMARY KEY,
       client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
@@ -184,9 +189,14 @@ app.post('/api/change-password', async (req, res) => {
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── Routes Clients ────────────────────────────────────
+// Colonnes sans le logo (BYTEA) — évite de le charger inutilement dans les listes
+const CLIENT_COLUMNS = `id, societe, code_client, contact_nom, contact_telephone, contact_email,
+  adresse, ville, type_prestation, type_client, date_debut_contrat, date_fin_contrat,
+  tacite_reconduction, tarif, tarif_unite, statut, notes, logo_mime_type, created_at, updated_at`;
+
 app.get('/api/clients', async (req, res) => {
   const { search, type_client } = req.query;
-  let text = 'SELECT * FROM clients WHERE 1=1';
+  let text = `SELECT ${CLIENT_COLUMNS} FROM clients WHERE 1=1`;
   const params = [];
   if (search) {
     params.push(`%${search}%`);
@@ -210,7 +220,7 @@ app.get('/api/clients/check-doublon', async (req, res) => {
 app.get('/api/clients/:id', async (req, res) => {
   const id = req.params.id;
   const [clientR, sitesR, docsR, histR] = await Promise.all([
-    query('SELECT * FROM clients WHERE id=$1', [id]),
+    query(`SELECT ${CLIENT_COLUMNS} FROM clients WHERE id=$1`, [id]),
     query('SELECT * FROM client_sites WHERE client_id=$1 ORDER BY created_at', [id]),
     query('SELECT id, client_id, type, nom_fichier, mime_type, taille_octets, uploaded_by, uploaded_at FROM client_documents WHERE client_id=$1 ORDER BY uploaded_at DESC', [id]),
     query('SELECT * FROM client_historique WHERE client_id=$1 ORDER BY date DESC', [id])
@@ -231,10 +241,10 @@ app.get('/api/clients/:id', async (req, res) => {
 app.post('/api/clients', async (req, res) => {
   const f = req.body;
   const { rows } = await query(
-    `INSERT INTO clients (societe,contact_nom,contact_telephone,contact_email,adresse,ville,type_prestation,
+    `INSERT INTO clients (societe,code_client,contact_nom,contact_telephone,contact_email,adresse,ville,type_prestation,
        type_client,date_debut_contrat,date_fin_contrat,tacite_reconduction,tarif,tarif_unite,statut,notes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
-    [f.societe, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
      f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
      !!f.tacite_reconduction, parseFloat(f.tarif) || 0, f.tarif_unite || 'mensuel', f.statut || 'Actif', f.notes]);
   res.json({ id: rows[0].id });
@@ -243,12 +253,32 @@ app.post('/api/clients', async (req, res) => {
 app.put('/api/clients/:id', async (req, res) => {
   const f = req.body;
   await query(
-    `UPDATE clients SET societe=$1,contact_nom=$2,contact_telephone=$3,contact_email=$4,adresse=$5,ville=$6,
-       type_prestation=$7,type_client=$8,date_debut_contrat=$9,date_fin_contrat=$10,tacite_reconduction=$11,
-       tarif=$12,tarif_unite=$13,statut=$14,notes=$15,updated_at=NOW() WHERE id=$16`,
-    [f.societe, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
+    `UPDATE clients SET societe=$1,code_client=$2,contact_nom=$3,contact_telephone=$4,contact_email=$5,adresse=$6,ville=$7,
+       type_prestation=$8,type_client=$9,date_debut_contrat=$10,date_fin_contrat=$11,tacite_reconduction=$12,
+       tarif=$13,tarif_unite=$14,statut=$15,notes=$16,updated_at=NOW() WHERE id=$17`,
+    [f.societe, f.code_client, f.contact_nom, f.contact_telephone, f.contact_email, f.adresse, f.ville, f.type_prestation,
      f.type_client || 'Régulier', f.date_debut_contrat || null, f.tacite_reconduction ? null : (f.date_fin_contrat || null),
      !!f.tacite_reconduction, parseFloat(f.tarif) || 0, f.tarif_unite, f.statut, f.notes, req.params.id]);
+  res.json({ ok: true });
+});
+
+app.post('/api/clients/:id/logo', upload.single('file'), async (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Aucun fichier reçu' });
+  await query('UPDATE clients SET logo_contenu=$1, logo_mime_type=$2 WHERE id=$3',
+    [req.file.buffer, req.file.mimetype, req.params.id]);
+  res.json({ ok: true });
+});
+
+app.get('/api/clients/:id/logo', async (req, res) => {
+  const { rows } = await query('SELECT logo_contenu, logo_mime_type FROM clients WHERE id=$1', [req.params.id]);
+  const c = rows[0];
+  if (!c || !c.logo_contenu) return res.status(404).end();
+  res.setHeader('Content-Type', c.logo_mime_type);
+  res.send(c.logo_contenu);
+});
+
+app.delete('/api/clients/:id/logo', async (req, res) => {
+  await query('UPDATE clients SET logo_contenu=NULL, logo_mime_type=NULL WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
 });
 
@@ -397,12 +427,12 @@ app.get('/api/kpi', async (req, res) => {
 
 // ─── Export CSV ───────────────────────────────────────
 app.get('/api/export/csv', async (req, res) => {
-  const { rows } = await query('SELECT * FROM clients ORDER BY societe');
-  const headers = ['ID','Société','Type de client','Contact','Téléphone','Email','Adresse','Ville',
+  const { rows } = await query(`SELECT ${CLIENT_COLUMNS} FROM clients ORDER BY societe`);
+  const headers = ['ID','Code client','Société','Type de client','Contact','Téléphone','Email','Adresse','Ville',
     'Type de prestation','Début contrat','Fin contrat','Tarif','Unité','Statut','Notes','Créé le','Modifié le'];
   const csv = [
     headers.join(';'),
-    ...rows.map(r => [r.id, r.societe, r.type_client, r.contact_nom, r.contact_telephone, r.contact_email,
+    ...rows.map(r => [r.id, r.code_client, r.societe, r.type_client, r.contact_nom, r.contact_telephone, r.contact_email,
       r.adresse, r.ville, r.type_prestation, r.date_debut_contrat, r.date_fin_contrat, r.tarif, r.tarif_unite,
       r.statut, `"${(r.notes||'').replace(/"/g,'""')}"`, r.created_at, r.updated_at].join(';'))
   ].join('\n');
