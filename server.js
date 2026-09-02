@@ -135,10 +135,12 @@ async function initDB() {
       created_at TIMESTAMP DEFAULT NOW()
     );
     INSERT INTO users (nom, username, password_hash) VALUES
-      ('Adber', 'adber', '$2b$10$KKfOWgjkRW34yAgqeEbzouqq9y/TR1TsfpuWJNkmAmNRj5l/NAkTC'),
+      ('Abder', 'abder', '$2b$10$YQ7ACExz9USL9asJRXM9VuYWb9JVue4UGv5IvCCxV1l2sA3LVlxLK'),
       ('Yanis', 'yanis', '$2b$10$m.mFTfPhAT4zQjHKvwsMgOtkDofJuPp03JJpdGJSV9G1Up1AfcfA2'),
       ('Samar', 'samar', '$2b$10$PnYV/obNFYaptJVhd95g7Og4acwvWMq1irLHDjnncKgdD28x21WdK')
     ON CONFLICT (username) DO NOTHING;
+    -- Migration ponctuelle : le compte avait été créé avec la faute de frappe "adber" au lieu de "abder"
+    UPDATE users SET username='abder', nom='Abder', password_hash='$2b$10$YQ7ACExz9USL9asJRXM9VuYWb9JVue4UGv5IvCCxV1l2sA3LVlxLK' WHERE username='adber';
   `);
   console.log('✅ Base de données initialisée');
 }
