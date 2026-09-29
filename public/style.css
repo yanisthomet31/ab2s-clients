@@ -934,6 +934,13 @@ input[type="file"]::file-selector-button:hover { background: var(--bg-2); }
 /* ─── CARTE (Leaflet) ────────────────────────────────── */
 .map-card { padding: 8px; }
 #carte-clients-map { height: calc(100vh - 200px); min-height: 460px; border-radius: 10px; overflow: hidden; }
+.leaflet-tile-pane { filter: saturate(.85); }
+:root[data-theme="dark"] .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.9) contrast(.88) saturate(.6); }
+:root[data-theme="dark"] .leaflet-container { background: #1A2035; }
+:root[data-theme="dark"] .leaflet-bar a { background: var(--card); color: var(--text); border-color: var(--border); }
+:root[data-theme="dark"] .leaflet-control-attribution { background: rgba(26,32,53,.8); color: var(--text3); }
+:root[data-theme="dark"] .leaflet-control-attribution a { color: var(--primary); }
+:root[data-theme="dark"] .leaflet-popup-content-wrapper, :root[data-theme="dark"] .leaflet-popup-tip { background: var(--card); color: var(--text); }
 .leaflet-popup-content-wrapper { border-radius: 12px !important; box-shadow: var(--shadow-md) !important; font-family: 'Inter', sans-serif; }
 .leaflet-popup-content { font-size: 13px; line-height: 1.55; margin: 14px 16px !important; }
 .leaflet-popup-content a { color: var(--primary); font-weight: 600; text-decoration: none; }
