@@ -4,112 +4,164 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Fiche client — AB2S Sécurité</title>
+<script>
+  // Même thème que le logiciel pour l'habillage autour de la feuille (la feuille reste blanche)
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('ab2s-theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 <link rel="icon" type="image/png" href="assets/logo.png">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap">
 <style>
   :root {
-    --navy: #1A237E;
-    --navy2: #283593;
-    --orange: #F57C00;
-    --chrome: #E4E7F0;
-    --chrome-ink: #5C6370;
+    /* Palette du logiciel (encre marine + abricot, adoucis) */
+    --primary: #3A4C96;
+    --primary-50: #EEF1FA;
+    --accent: #E0915E;
+    --accent-50: #FCF1E9;
+    --accent-ink: #B96A3A;
+    --ink: #1B2233;
+    --ink2: #5B6478;
+    --ink3: #8C93A5;
+    --line: #E5E8EF;
+    --line-strong: #D8DCE6;
+    --tint: #F6F7FA;
     --paper: #FFFFFF;
-    --ink: #1A1A2E;
-    --ink2: #5C6370;
-    --ink3: #8A8FA3;
-    --line: #E0E4F0;
-    --line-strong: #C7CCE0;
-    --tint: #F4F5FB;
-    --good-bg: #E8F5E9;
-    --good-ink: #1B5E20;
-    --warn-bg: #FFF3E0;
-    --warn-ink: #E65100;
+    --success: #3F8A68; --success-bg: #E8F3ED;
+    --warning: #B7812F; --warning-bg: #FAF1E1;
+    --neutral: #6F7689; --neutral-bg: #EFF1F5;
+    --info: #4A6FA5;    --info-bg: #EAF0F8;
+
+    --chrome: #F4F5F8;
+    --chrome-ink: #5B6478;
+    --chrome-card: #FFFFFF;
+    --chrome-border: #D8DCE6;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --chrome: #0F1220; --chrome-ink: #9096AC; }
+  :root[data-theme="dark"] {
+    --chrome: #0E1322;
+    --chrome-ink: #A7AEC2;
+    --chrome-card: #1A2035;
+    --chrome-border: #323B5C;
   }
-  :root[data-theme="dark"] { --chrome: #0F1220; --chrome-ink: #9096AC; }
 
   * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; }
   body {
     margin: 0;
     background: var(--chrome);
     color: var(--chrome-ink);
-    font-family: "Public Sans", ui-sans-serif, system-ui, sans-serif;
-    padding: 48px 20px 80px;
-    display: flex; flex-direction: column; align-items: center; gap: 28px;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-feature-settings: "cv11", "ss01";
+    padding: 36px 20px 80px;
+    display: flex; flex-direction: column; align-items: center; gap: 24px;
   }
 
-  .toolbar { width: 100%; max-width: 900px; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
-  .toolbar-label { font-family: "Archivo", sans-serif; font-weight: 700; font-size: 13px; letter-spacing: .04em; text-transform: uppercase; color: var(--chrome-ink); }
-  .toolbar-sub { font-size: 12.5px; color: var(--chrome-ink); opacity: .75; margin-top: 2px; }
-  .btn-print {
-    font-family: "Archivo", sans-serif; font-weight: 700; font-size: 12.5px; letter-spacing: .03em; text-transform: uppercase;
-    background: var(--navy); color: #fff; border: none; border-radius: 3px; padding: 11px 20px; cursor: pointer; transition: background .15s ease;
-  }
-  .btn-print:hover { background: var(--navy2); }
-  .btn-print:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+  /* ─── Barre d'outils (hors impression) ─── */
+  .toolbar { width: 100%; max-width: 210mm; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  .toolbar-left { display: flex; align-items: center; gap: 14px; }
+  .toolbar-label { font-weight: 650; font-size: 15px; color: var(--chrome-ink); }
+  .toolbar-sub { font-size: 13px; opacity: .75; margin-top: 2px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; font-family: inherit; font-size: 13.5px; font-weight: 600; border-radius: 10px; padding: 10px 16px; cursor: pointer; text-decoration: none; transition: transform .2s, box-shadow .2s, background .2s; }
+  .btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  .btn-back { background: var(--chrome-card); color: var(--chrome-ink); border: 1px solid var(--chrome-border); }
+  .btn-back:hover { transform: translateY(-1px); }
+  .btn-print { background: linear-gradient(180deg, #4457A6 0%, #3A4C96 100%); color: #fff; border: 1px solid #32427F; box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 6px 16px -6px rgba(58,76,150,.55); }
+  .btn-print:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 12px 24px -8px rgba(58,76,150,.6); }
 
+  /* ─── Feuille A4 ─── */
   .sheet {
     width: 210mm; min-height: 297mm; max-width: 100%;
     background: var(--paper); color: var(--ink);
-    box-shadow: 0 8px 40px rgba(10, 14, 40, .35);
-    padding: 16mm 15mm 14mm;
-    display: flex; flex-direction: column; gap: 7mm;
+    border-radius: 6px;
+    box-shadow: 0 2px 6px rgba(20,28,54,.06), 0 24px 60px -20px rgba(20,28,54,.35);
+    padding: 14mm 14mm 12mm;
+    display: flex; flex-direction: column; gap: 6.5mm;
+    font-size: 12.5px;
+    animation: rise .5s cubic-bezier(.22,.61,.36,1) both;
   }
+  @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
-  .letterhead { display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 5mm; border-bottom: 2.5px solid var(--navy); }
-  .letterhead-brand { display: flex; align-items: center; gap: 10px; }
-  .letterhead-mark { width: 40px; height: 40px; object-fit: contain; flex-shrink: 0; }
-  .letterhead-name { font-family: "Archivo", sans-serif; font-weight: 800; font-size: 15px; letter-spacing: .02em; color: var(--navy); line-height: 1.15; }
+  .letterhead { display: flex; align-items: center; justify-content: space-between; padding-bottom: 5mm; border-bottom: 1px solid var(--line); }
+  .letterhead-brand { display: flex; align-items: center; gap: 12px; }
+  .letterhead-mark { width: 44px; height: 44px; object-fit: contain; border-radius: 12px; border: 1px solid var(--line); padding: 3px; background: #fff; }
+  .letterhead-name { font-weight: 700; font-size: 15px; color: var(--ink); line-height: 1.2; }
+  .letterhead-sub { font-size: 11px; color: var(--ink3); font-weight: 500; }
   .letterhead-doc { text-align: right; }
-  .letterhead-doc-title { font-family: "Archivo", sans-serif; font-weight: 700; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink2); }
-  .letterhead-doc-ref { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: var(--ink3); margin-top: 3px; }
+  .letterhead-doc-title { font-size: 10.5px; font-weight: 650; letter-spacing: .9px; text-transform: uppercase; color: var(--accent-ink); }
+  .letterhead-doc-ref { font-size: 11px; color: var(--ink3); margin-top: 3px; font-variant-numeric: tabular-nums; }
 
-  .identity { display: flex; align-items: center; gap: 14px; padding: 5mm 0 6mm; border-bottom: 1px solid var(--line); }
-  .identity-logo { width: 62px; height: 62px; border-radius: 8px; border: 1px solid var(--line); background: var(--tint); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
-  .identity-logo img { width: 100%; height: 100%; object-fit: contain; }
-  .identity-logo-fallback { font-family: "Archivo", sans-serif; font-weight: 800; font-size: 20px; color: var(--ink3); }
+  /* En-tête client, dans l'esprit de la fiche du logiciel */
+  .hero { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .identity {
+    display: flex; align-items: center; gap: 16px; padding: 6mm;
+    background:
+      radial-gradient(60% 120% at 100% 0%, var(--accent-50) 0%, transparent 60%),
+      linear-gradient(180deg, var(--primary-50) 0%, #fff 100%);
+  }
+  .identity-logo { width: 64px; height: 64px; border-radius: 16px; border: 1px solid var(--line); background: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+  .identity-logo img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
+  .identity-logo-fallback { font-weight: 700; font-size: 20px; color: var(--primary); }
   .identity-main { flex: 1; min-width: 0; }
-  .identity-name { font-family: "Archivo", sans-serif; font-weight: 800; font-size: 21px; color: var(--ink); line-height: 1.2; text-wrap: balance; }
-  .identity-code { font-family: "IBM Plex Mono", monospace; font-size: 12px; color: var(--ink3); margin-top: 3px; }
-  .identity-badges { display: flex; gap: 6px; flex-shrink: 0; }
-  .pill { font-family: "Archivo", sans-serif; font-weight: 700; font-size: 10px; letter-spacing: .04em; text-transform: uppercase; padding: 4px 10px; border-radius: 20px; white-space: nowrap; }
-  .pill-regulier { background: #E3F2FD; color: #1565C0; }
-  .pill-occasionnel { background: var(--warn-bg); color: var(--warn-ink); }
-  .pill-actif { background: var(--good-bg); color: var(--good-ink); }
-  .pill-suspendu { background: var(--warn-bg); color: var(--warn-ink); }
-  .pill-termine { background: #FFEBEE; color: #B71C1C; }
+  .identity-name { font-weight: 700; font-size: 21px; letter-spacing: -.4px; color: var(--ink); line-height: 1.2; text-wrap: balance; }
+  .identity-code { display: inline-block; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; color: var(--ink2); background: var(--neutral-bg); border-radius: 999px; padding: 2px 9px; margin-top: 6px; }
+  .identity-code:empty { display: none; }
+  .identity-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 45%; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-weight: 550; font-size: 11px; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+  .pill-dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .pill-regulier { background: var(--info-bg); color: var(--info); }
+  .pill-occasionnel { background: var(--accent-50); color: var(--accent-ink); }
+  .pill-actif { background: var(--success-bg); color: var(--success); }
+  .pill-suspendu { background: var(--warning-bg); color: var(--warning); }
+  .pill-termine { background: var(--neutral-bg); color: var(--neutral); }
+  .pill-categorie { background: var(--neutral-bg); color: var(--neutral); }
 
-  .section-label { font-family: "Archivo", sans-serif; font-weight: 700; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--navy); display: flex; align-items: center; gap: 8px; margin-bottom: 3mm; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); }
+  .stat { padding: 3.5mm 6mm; display: flex; flex-direction: column; gap: 2px; }
+  .stat + .stat { border-left: 1px solid var(--line); }
+  .stat-label { font-size: 10px; color: var(--ink3); font-weight: 500; }
+  .stat-value { font-size: 13.5px; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stat-value small { font-weight: 450; color: var(--ink3); font-size: 11px; }
+
+  /* Sections */
+  .section { display: flex; flex-direction: column; break-inside: avoid; }
+  .section-label { font-weight: 650; font-size: 10.5px; letter-spacing: .8px; text-transform: uppercase; color: var(--ink3); display: flex; align-items: center; gap: 10px; margin-bottom: 3mm; }
+  .section-label::before { content: ''; width: 3px; height: 12px; border-radius: 2px; background: var(--accent); }
   .section-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
-  .field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5mm 6mm; }
+  .field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm 6mm; }
   .field-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
   .field { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .field-label { font-family: "Archivo", sans-serif; font-weight: 600; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink3); }
-  .field-value { font-size: 13.5px; color: var(--ink); font-weight: 500; }
-  .field-value.mono { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; }
-  .field-value.muted { color: var(--ink3); font-style: italic; font-weight: 400; }
-  .section { display: flex; flex-direction: column; }
+  .field-label { font-size: 10.5px; color: var(--ink3); font-weight: 500; }
+  .field-value { font-size: 12.5px; color: var(--ink); font-weight: 500; word-break: break-word; }
+  .field-value.mono { font-variant-numeric: tabular-nums; }
 
-  .sites-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .sites-table th { font-family: "Archivo", sans-serif; font-weight: 700; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; color: var(--ink3); text-align: left; padding: 0 8px 3mm 0; border-bottom: 1px solid var(--line-strong); }
-  .sites-table td { padding: 3mm 8px 3mm 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-  .sites-table tr:last-child td { border-bottom: none; }
-  .site-name { font-weight: 600; color: var(--ink); }
-  .site-code { display: inline-block; font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--navy); background: var(--tint); padding: 1px 6px; border-radius: 3px; margin-top: 2px; }
+  .table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .table th { font-weight: 600; font-size: 10px; letter-spacing: .5px; text-transform: uppercase; color: var(--ink3); text-align: left; padding: 0 8px 2.5mm 0; border-bottom: 1px solid var(--line-strong); }
+  .table td { padding: 2.6mm 8px 2.6mm 0; border-bottom: 1px solid var(--line); vertical-align: top; color: var(--ink2); }
+  .table tr:last-child td { border-bottom: none; }
+  .table .num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 0; }
+  .table tfoot td { border-top: 1px solid var(--line-strong); font-weight: 650; color: var(--ink); }
+  .strong { font-weight: 600; color: var(--ink); }
+  .site-code { display: inline-block; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; color: var(--ink2); background: var(--neutral-bg); padding: 1px 7px; border-radius: 999px; margin-left: 6px; }
+  .evo { font-size: 10.5px; font-weight: 600; margin-left: 6px; }
+  .evo.up { color: var(--success); }
+  .evo.down { color: #C0564E; }
 
-  .notes-box { font-size: 13px; color: var(--ink2); line-height: 1.55; background: var(--tint); border-left: 3px solid var(--orange); border-radius: 0 4px 4px 0; padding: 3.5mm 5mm; }
+  .notes-box { font-size: 12.5px; color: var(--ink2); line-height: 1.55; background: var(--tint); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; padding: 3.5mm 5mm; white-space: pre-wrap; }
 
-  .sheet-footer { margin-top: auto; padding-top: 5mm; border-top: 1px solid var(--line); display: flex; justify-content: flex-end; align-items: center; font-size: 9.5px; color: var(--ink3); }
-  .sheet-footer .fp { font-family: "IBM Plex Mono", monospace; }
+  .sheet-footer { margin-top: auto; padding-top: 4mm; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--ink3); }
 
-  .error-box { max-width: 900px; background: var(--paper); color: var(--ink); border-radius: 8px; padding: 24px; }
+  .error-box { max-width: 600px; background: var(--chrome-card); color: var(--chrome-ink); border: 1px solid var(--chrome-border); border-radius: 14px; padding: 24px; }
 
   @media print {
-    body { padding: 0; background: var(--paper); }
+    html, body { background: #fff !important; }
+    body { padding: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .toolbar { display: none; }
-    .sheet { box-shadow: none; width: auto; min-height: 0; }
+    .sheet { box-shadow: none; border-radius: 0; width: auto; min-height: 0; animation: none; }
     @page { size: A4; margin: 0; }
   }
 </style>
@@ -117,18 +169,29 @@
 <body>
 
 <div class="toolbar" id="toolbar">
-  <div>
-    <div class="toolbar-label">Fiche client</div>
-    <div class="toolbar-sub" id="toolbar-sub">Chargement…</div>
+  <div class="toolbar-left">
+    <a class="btn btn-back" id="btn-back" href="/">
+      <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>Retour
+    </a>
+    <div>
+      <div class="toolbar-label">Fiche client</div>
+      <div class="toolbar-sub" id="toolbar-sub">Chargement…</div>
+    </div>
   </div>
-  <button class="btn-print" onclick="window.print()">Imprimer / Enregistrer en PDF</button>
+  <button class="btn btn-print" onclick="window.print()">
+    <svg viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></svg>
+    Imprimer / Enregistrer en PDF
+  </button>
 </div>
 
 <div class="sheet" id="sheet" style="display:none">
   <div class="letterhead">
     <div class="letterhead-brand">
       <img class="letterhead-mark" src="assets/logo.png" alt="AB2S Sécurité">
-      <div class="letterhead-name">AB2S SÉCURITÉ</div>
+      <div>
+        <div class="letterhead-name">AB2S Sécurité</div>
+        <div class="letterhead-sub">Surveillance &amp; gardiennage</div>
+      </div>
     </div>
     <div class="letterhead-doc">
       <div class="letterhead-doc-title">Fiche client</div>
@@ -136,24 +199,33 @@
     </div>
   </div>
 
-  <div class="identity">
-    <div class="identity-logo" id="identity-logo">
-      <span class="identity-logo-fallback" id="identity-logo-fallback"></span>
+  <div class="hero">
+    <div class="identity">
+      <div class="identity-logo" id="identity-logo">
+        <span class="identity-logo-fallback" id="identity-logo-fallback"></span>
+      </div>
+      <div class="identity-main">
+        <div class="identity-name" id="f-societe"></div>
+        <span class="identity-code" id="f-code-client"></span>
+      </div>
+      <div class="identity-badges">
+        <span class="pill pill-dot" id="pill-statut"></span>
+        <span class="pill" id="pill-type"></span>
+        <span class="pill pill-categorie" id="pill-categorie"></span>
+      </div>
     </div>
-    <div class="identity-main">
-      <div class="identity-name" id="f-societe"></div>
-      <div class="identity-code" id="f-code-client"></div>
-    </div>
-    <div class="identity-badges">
-      <span class="pill" id="pill-type"></span>
-      <span class="pill" id="pill-statut"></span>
+    <div class="stats">
+      <div class="stat"><span class="stat-label">Début de contrat</span><span class="stat-value" id="s-debut"></span></div>
+      <div class="stat"><span class="stat-label">Fin de contrat</span><span class="stat-value" id="s-fin"></span></div>
+      <div class="stat"><span class="stat-label" id="s-tarif-label">Tarif</span><span class="stat-value" id="s-tarif"></span></div>
+      <div class="stat"><span class="stat-label" id="s-ca-label">CA de l'année</span><span class="stat-value" id="s-ca"></span></div>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-label">Contact</div>
+    <div class="section-label">Coordonnées</div>
     <div class="field-grid cols-2">
-      <div class="field"><div class="field-label">Interlocuteur</div><div class="field-value" id="f-contact-nom"></div></div>
+      <div class="field"><div class="field-label">Interlocuteur principal</div><div class="field-value" id="f-contact-nom"></div></div>
       <div class="field"><div class="field-label">Adresse</div><div class="field-value" id="f-adresse"></div></div>
       <div class="field"><div class="field-label">Téléphone</div><div class="field-value mono" id="f-telephone"></div></div>
       <div class="field"><div class="field-label">Email</div><div class="field-value" id="f-email"></div></div>
@@ -161,9 +233,9 @@
   </div>
 
   <div class="section" id="section-contacts">
-    <div class="section-label">Autres contacts</div>
-    <table class="sites-table">
-      <thead><tr><th style="width:28%">Nom</th><th style="width:22%">Poste</th><th style="width:25%">Téléphone</th><th>Email</th></tr></thead>
+    <div class="section-label">Contacts</div>
+    <table class="table">
+      <thead><tr><th style="width:28%">Nom</th><th style="width:22%">Poste</th><th style="width:22%">Téléphone</th><th>Email</th></tr></thead>
       <tbody id="contacts-tbody"></tbody>
     </table>
   </div>
@@ -174,36 +246,32 @@
       <div class="field"><div class="field-label">SIRET</div><div class="field-value mono" id="f-siret"></div></div>
       <div class="field"><div class="field-label">N° TVA</div><div class="field-value mono" id="f-tva"></div></div>
       <div class="field"><div class="field-label">Capital social</div><div class="field-value" id="f-capital-social"></div></div>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-label">Contrat</div>
-    <div class="field-grid">
+      <div class="field"><div class="field-label">Site web</div><div class="field-value" id="f-site-web"></div></div>
       <div class="field"><div class="field-label">Prestation</div><div class="field-value" id="f-type-prestation"></div></div>
-      <div class="field"><div class="field-label">Début de contrat</div><div class="field-value mono" id="f-date-debut"></div></div>
-      <div class="field"><div class="field-label">Fin de contrat</div><div class="field-value" id="f-date-fin"></div></div>
-      <div class="field"><div class="field-label">Tarif</div><div class="field-value mono" id="f-tarif"></div></div>
-      <div class="field"><div class="field-label">Statut</div><div class="field-value" id="f-statut"></div></div>
       <div class="field"><div class="field-label">Type de client</div><div class="field-value" id="f-type-client"></div></div>
-      <div class="field"><div class="field-label">Catégorie</div><div class="field-value" id="f-categorie-client"></div></div>
     </div>
   </div>
 
   <div class="section" id="section-sites">
     <div class="section-label">Sites</div>
-    <table class="sites-table">
+    <table class="table">
       <thead><tr><th style="width:40%">Site</th><th>Adresse</th></tr></thead>
       <tbody id="sites-tbody"></tbody>
     </table>
   </div>
 
-  <div class="section" id="section-tarifs">
-    <div class="section-label">Historique tarifaire</div>
-    <table class="sites-table">
-      <thead><tr><th style="width:30%">Année</th><th>Taux horaire</th></tr></thead>
-      <tbody id="tarifs-tbody"></tbody>
-    </table>
+  <div class="section" id="section-finances">
+    <div class="section-label">Tarifs et chiffre d'affaires</div>
+    <div class="field-grid cols-2" style="align-items:start">
+      <table class="table" id="table-tarifs">
+        <thead><tr><th>Année</th><th class="num">Taux horaire</th></tr></thead>
+        <tbody id="tarifs-tbody"></tbody>
+      </table>
+      <table class="table" id="table-ca">
+        <thead><tr><th>Année</th><th class="num">CA HT</th></tr></thead>
+        <tbody id="ca-tbody"></tbody>
+      </table>
+    </div>
   </div>
 
   <div class="section" id="section-notes">
@@ -212,7 +280,8 @@
   </div>
 
   <div class="sheet-footer">
-    <span class="fp" id="doc-date"></span>
+    <span>AB2S Sécurité — document interne</span>
+    <span id="doc-date"></span>
   </div>
 </div>
 
