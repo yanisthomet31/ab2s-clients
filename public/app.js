@@ -20,6 +20,8 @@ const state = {
 
 // Catégories : ordre fixe → couleur fixe (--series-1…4)
 const CATEGORIES = ['Collectivité locale', 'Grande distribution', 'Société de sécurité privée', 'Autres'];
+// Qualifications proposées (saisie libre possible)
+const QUALIFICATIONS = ['ADS', 'SSIAP 1', 'SSIAP 2', 'SSIAP 3', 'Cynophile', 'Chef de poste', 'Rondier intervenant', 'Opérateur télésurveillance', 'Agent événementiel', 'Agent de sûreté aéroportuaire'];
 const MOIS_COURTS = ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.'];
 
 // ─── Init ─────────────────────────────────────────────
@@ -513,9 +515,13 @@ function clientPageLayout() {
             <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
           </form>` })}
         ${block({ id: 'tarifs', icon: 'euro', title: 'Tarifs horaires', addLabel: 'Ajouter', form: `
-          <form class="inline-form" onsubmit="addTarif(event)">
-            <div class="form-group"><label>Année</label><input type="number" name="annee" value="${new Date().getFullYear()}" style="width:100px" required></div>
-            <div class="form-group grow"><label>Taux horaire (€)</label><input type="number" name="taux_horaire" step="0.01" min="0" placeholder="0,00" required></div>
+          <form class="inline-form wrap" onsubmit="addTarif(event)">
+            <div class="form-group grow"><label>Qualification</label>
+              <input type="text" name="qualification" list="qualifs-list" placeholder="ADS, SSIAP 1…" autocomplete="off" required>
+              <datalist id="qualifs-list">${QUALIFICATIONS.map(q => `<option value="${q}">`).join('')}</datalist>
+            </div>
+            <div class="form-group"><label>Année</label><input type="number" name="annee" value="${new Date().getFullYear()}" style="width:90px" required></div>
+            <div class="form-group"><label>Taux horaire (€)</label><input type="number" name="taux_horaire" step="0.01" min="0" placeholder="0,00" style="width:120px" required></div>
             <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
           </form>` })}
         ${block({ id: 'documents', icon: 'file', title: 'Documents', form: null, headAction: `
@@ -585,7 +591,10 @@ function renderClientHero(c) {
   const annee = new Date().getFullYear();
   const caAnnee = (c.ca || []).filter(e => e.mois.startsWith(String(annee)) && !isPending('ca', e.id))
     .reduce((s, e) => s + Number(e.montant), 0);
-  const tarif = [...(c.tarifs || [])].sort((a, b) => b.annee - a.annee)[0];
+  const tarifs = (c.tarifs || []).filter(t => !isPending('tarifs', t.id));
+  const derniereAnnee = tarifs.length ? Math.max(...tarifs.map(t => t.annee)) : null;
+  const tarifsAnnee = tarifs.filter(t => t.annee === derniereAnnee).map(t => Number(t.taux_horaire));
+  const tarifMin = Math.min(...tarifsAnnee), tarifMax = Math.max(...tarifsAnnee);
   const jours = c.date_fin_contrat ? daysUntil(c.date_fin_contrat) : null;
   const tel = c.contact_telephone || (c.contacts || []).find(k => k.telephone)?.telephone;
   const mail = c.contact_email || (c.contacts || []).find(k => k.email)?.email;
@@ -627,9 +636,10 @@ function renderClientHero(c) {
             : c.date_fin_contrat ? `${formatDateShort(c.date_fin_contrat)} ${jours !== null && jours >= 0 && jours <= 90 ? joursPill(jours) : ''}` : '—'}</span>
         </div>
         <div class="hero-stat">
-          <span class="hs-label">Tarif ${tarif ? `horaire ${tarif.annee}` : 'contractuel'}</span>
-          <span class="hs-value">${tarif ? `${fmtEUR(tarif.taux_horaire, 2)} / h`
-            : Number(c.tarif) ? `${fmtEUR(c.tarif)} <small>${esc(c.tarif_unite || '')}</small>` : '—'}</span>
+          <span class="hs-label">${derniereAnnee ? `Tarif${tarifsAnnee.length > 1 ? 's' : ''} horaire${tarifsAnnee.length > 1 ? 's' : ''} ${derniereAnnee}` : 'Tarif contractuel'}</span>
+          <span class="hs-value">${derniereAnnee
+            ? (tarifMin === tarifMax ? `${fmtEUR(tarifMin, 2)} <small>/ h</small>` : `${fmtEUR(tarifMin, 2)} à ${fmtEUR(tarifMax, 2)} <small>/ h · ${tarifsAnnee.length} qualifs</small>`)
+            : Number(c.tarif) ? `${fmtEUR(c.tarif, 2)} <small>${esc(c.tarif_unite || '')}</small>` : '—'}</span>
         </div>
         <div class="hero-stat">
           <span class="hs-label">CA ${annee}</span>
@@ -841,27 +851,36 @@ function renderTarifs() {
   setCount('tarifs', tarifs.length);
   const el = document.getElementById('body-tarifs');
   if (!tarifs.length) { el.innerHTML = emptyBlock('euro', 'Aucun tarif enregistré'); return; }
-  const sorted = [...tarifs].sort((a, b) => b.annee - a.annee);
-  el.innerHTML = `<div class="tarif-list">${sorted.map((t, i) => {
-    const prev = sorted[i + 1];
-    const evo = prev && Number(prev.taux_horaire) ? (Number(t.taux_horaire) - Number(prev.taux_horaire)) / Number(prev.taux_horaire) * 100 : null;
+  // Regroupé par année (la plus récente d'abord) ; évolution calculée par qualification
+  const qualif = t => t.qualification || 'Général';
+  const annees = [...new Set(tarifs.map(t => t.annee))].sort((a, b) => b - a);
+  el.innerHTML = `<div class="tarif-list">${annees.map(annee => {
+    const lignes = tarifs.filter(t => t.annee === annee).sort((a, b) => qualif(a).localeCompare(qualif(b), 'fr'));
     return `
-    <div class="tarif-row">
-      <span class="tarif-year">${esc(t.annee)}</span>
-      <span class="tarif-rate">${fmtEUR(t.taux_horaire, 2)} <small>/ heure</small></span>
-      ${evo !== null ? `<span class="kpi-delta ${evo >= 0 ? 'up' : 'down'}">${evo >= 0 ? '+' : ''}${evo.toFixed(1).replace('.', ',')} %</span>` : '<span></span>'}
-      ${delBtn(`deleteTarif(${t.id})`)}
-    </div>`;
+    <div class="tarif-year-head">${esc(annee)}</div>
+    ${lignes.map(t => {
+      const prev = tarifs.filter(p => qualif(p) === qualif(t) && p.annee < t.annee).sort((a, b) => b.annee - a.annee)[0];
+      const evo = prev && Number(prev.taux_horaire) ? (Number(t.taux_horaire) - Number(prev.taux_horaire)) / Number(prev.taux_horaire) * 100 : null;
+      return `
+      <div class="tarif-row">
+        <span class="tarif-qualif">${esc(qualif(t))}</span>
+        <span class="tarif-rate">${fmtEUR(t.taux_horaire, 2)} <small>/ h</small></span>
+        ${evo !== null ? `<span class="kpi-delta ${evo >= 0 ? 'up' : 'down'}" title="par rapport à ${prev.annee}">${evo >= 0 ? '+' : ''}${evo.toFixed(1).replace('.', ',')} %</span>` : '<span></span>'}
+        ${delBtn(`deleteTarif(${t.id})`)}
+      </div>`;
+    }).join('')}`;
   }).join('')}</div>`;
 }
 
 async function addTarif(e) {
   e.preventDefault();
   const f = formValues(e.target);
-  if (!f.annee || !f.taux_horaire) return toast('Année et taux horaire requis', true);
+  if (!f.qualification || !f.annee || !f.taux_horaire) return toast('Qualification, année et taux horaire requis', true);
   await api(`/api/clients/${state.clientId}/tarifs`, { method: 'POST', body: f });
+  e.target.querySelector('[name=qualification]').value = '';
   e.target.querySelector('[name=taux_horaire]').value = '';
-  toast('Tarif ajouté');
+  e.target.querySelector('[name=qualification]').focus();
+  toast(`Tarif ${f.qualification} ajouté`);
   refreshClient();
 }
 

@@ -46,15 +46,18 @@
 
   // Bandeau de synthèse
   const annee = new Date().getFullYear();
-  const tarifs = [...(data.tarifs || [])].sort((a, b) => b.annee - a.annee);
+  const qualif = t => t.qualification || 'Général';
+  const tarifs = [...(data.tarifs || [])].sort((a, b) => b.annee - a.annee || qualif(a).localeCompare(qualif(b), 'fr'));
   const ca = data.ca || [];
   set('s-debut', data.date_debut_contrat ? formatDate(data.date_debut_contrat) : '');
   set('s-fin', data.tacite_reconduction ? 'Tacite reconduction' : (data.date_fin_contrat ? formatDate(data.date_fin_contrat) : ''));
   if (tarifs.length) {
-    document.getElementById('s-tarif-label').textContent = `Tarif horaire ${tarifs[0].annee}`;
-    document.getElementById('s-tarif').innerHTML = `${eur(tarifs[0].taux_horaire, 2)} <small>/ h</small>`;
+    const derniers = tarifs.filter(t => t.annee === tarifs[0].annee).map(t => Number(t.taux_horaire));
+    const min = Math.min(...derniers), max = Math.max(...derniers);
+    document.getElementById('s-tarif-label').textContent = `Tarif${derniers.length > 1 ? 's' : ''} horaire${derniers.length > 1 ? 's' : ''} ${tarifs[0].annee}`;
+    document.getElementById('s-tarif').innerHTML = min === max ? `${eur(min, 2)} <small>/ h</small>` : `${eur(min, 2)} à ${eur(max, 2)} <small>/ h</small>`;
   } else if (Number(data.tarif)) {
-    document.getElementById('s-tarif').innerHTML = `${eur(data.tarif)} <small>${esc(data.tarif_unite || '')}</small>`;
+    document.getElementById('s-tarif').innerHTML = `${eur(data.tarif, 2)} <small>${esc(data.tarif_unite || '')}</small>`;
   } else set('s-tarif', '');
   document.getElementById('s-ca-label').textContent = `CA ${annee}`;
   set('s-ca', eur(ca.filter(e => e.mois.startsWith(String(annee))).reduce((s, e) => s + Number(e.montant), 0)));
@@ -101,10 +104,11 @@
 
   // Tarifs (avec évolution) et CA par année
   if (tarifs.length) {
-    document.getElementById('tarifs-tbody').innerHTML = tarifs.map((t, i) => {
-      const prev = tarifs[i + 1];
+    // Sur la fiche : seulement l'année la plus récente (l'historique complet reste dans le logiciel)
+    document.getElementById('tarifs-tbody').innerHTML = tarifs.filter(t => t.annee === tarifs[0].annee).map(t => {
+      const prev = tarifs.find(p => qualif(p) === qualif(t) && p.annee < t.annee);
       const evo = prev && Number(prev.taux_horaire) ? (t.taux_horaire - prev.taux_horaire) / prev.taux_horaire * 100 : null;
-      return `<tr><td class="strong">${esc(t.annee)}</td><td class="num">${eur(t.taux_horaire, 2)} / h${evo !== null
+      return `<tr><td class="strong">${esc(qualif(t))}</td><td>${esc(t.annee)}</td><td class="num">${eur(t.taux_horaire, 2)} / h${evo !== null
         ? `<span class="evo ${evo >= 0 ? 'up' : 'down'}">${evo >= 0 ? '+' : ''}${evo.toFixed(1).replace('.', ',')} %</span>` : ''}</td></tr>`;
     }).join('');
   } else {
