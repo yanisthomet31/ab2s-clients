@@ -378,7 +378,7 @@ app.delete('/api/sites/:id', async (req, res) => {
 // ─── Route Sites (vue globale par client) ──────────────
 app.get('/api/clients-sites', async (req, res) => {
   const { rows: clients } = await query(
-    `SELECT id, societe, code_client FROM clients ORDER BY societe`);
+    `SELECT id, societe, code_client, logo_mime_type FROM clients ORDER BY societe`);
   for (const c of clients) {
     const { rows } = await query(
       'SELECT id, nom_site, code_site, adresse_site FROM client_sites WHERE client_id=$1 ORDER BY created_at',
