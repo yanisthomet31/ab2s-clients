@@ -1271,13 +1271,14 @@ let carteClientsMap = null;
 let carteTiles = null;
 let carteClientsMarkers = [];
 
+// Fond OpenStreetMap (sans clé) ; le mode sombre est obtenu par un filtre CSS sur les tuiles
 function updateMapTiles() {
   if (!carteClientsMap) return;
-  if (carteTiles) carteClientsMap.removeLayer(carteTiles);
-  const style = currentTheme() === 'dark' ? 'dark_all' : 'rastertiles/voyager';
-  carteTiles = L.tileLayer(`https://{s}.basemaps.cartocdn.com/${style}/{z}/{x}/{y}{r}.png`, {
-    attribution: '© OpenStreetMap © CARTO', maxZoom: 18
-  }).addTo(carteClientsMap);
+  if (!carteTiles) {
+    carteTiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(carteClientsMap);
+  }
   if (state.page === 'carte') loadCarteClients();
 }
 
