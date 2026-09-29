@@ -315,9 +315,16 @@
         <h1>Carte des clients</h1>
         <p class="page-sub">Répartition géographique de votre portefeuille.</p>
       </div>
-      <div class="map-legend">
-        <span><i style="background:var(--series-1)"></i>Réguliers</span>
-        <span><i style="background:var(--series-2)"></i>Occasionnels</span>
+      <div class="header-actions">
+        <div class="map-legend">
+          <span><i style="background:var(--series-1)"></i>Réguliers</span>
+          <span><i style="background:var(--series-2)"></i>Occasionnels</span>
+          <span><i class="legend-region"></i>Occitanie</span>
+        </div>
+        <div class="seg">
+          <button class="seg-btn active" id="map-view-occitanie" onclick="setMapView('occitanie')">Occitanie</button>
+          <button class="seg-btn" id="map-view-france" onclick="setMapView('france')">France entière</button>
+        </div>
       </div>
     </div>
     <div class="card map-card">
