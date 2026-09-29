@@ -116,6 +116,7 @@ async function initDB() {
       taux_horaire NUMERIC,
       created_at TIMESTAMP DEFAULT NOW()
     );
+    ALTER TABLE client_tarifs ADD COLUMN IF NOT EXISTS qualification TEXT;
     CREATE TABLE IF NOT EXISTS client_documents (
       id SERIAL PRIMARY KEY,
       client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
@@ -257,7 +258,7 @@ app.get('/api/clients/:id', async (req, res) => {
     query('SELECT id, client_id, type, nom_fichier, mime_type, taille_octets, uploaded_by, uploaded_at FROM client_documents WHERE client_id=$1 ORDER BY uploaded_at DESC', [id]),
     query('SELECT * FROM client_historique WHERE client_id=$1 ORDER BY date DESC', [id]),
     query('SELECT * FROM client_contacts WHERE client_id=$1 ORDER BY created_at', [id]),
-    query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee', [id]),
+    query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee, qualification NULLS FIRST', [id]),
     query(`SELECT id, client_id, to_char(mois, 'YYYY-MM') AS mois, libelle, montant, auteur, created_at
            FROM client_ca WHERE client_id=$1 ORDER BY mois DESC, id DESC`, [id])
   ]);
@@ -390,15 +391,15 @@ app.get('/api/clients-sites', async (req, res) => {
 
 // ─── Routes Tarifs ──────────────────────────────────────
 app.get('/api/clients/:clientId/tarifs', async (req, res) => {
-  const { rows } = await query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee', [req.params.clientId]);
+  const { rows } = await query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee, qualification NULLS FIRST', [req.params.clientId]);
   res.json(rows);
 });
 
 app.post('/api/clients/:clientId/tarifs', async (req, res) => {
-  const { annee, taux_horaire } = req.body;
+  const { annee, taux_horaire, qualification } = req.body;
   const { rows } = await query(
-    'INSERT INTO client_tarifs (client_id,annee,taux_horaire) VALUES ($1,$2,$3) RETURNING id',
-    [req.params.clientId, parseInt(annee), parseFloat(taux_horaire) || 0]);
+    'INSERT INTO client_tarifs (client_id,annee,taux_horaire,qualification) VALUES ($1,$2,$3,$4) RETURNING id',
+    [req.params.clientId, parseInt(annee), parseFloat(taux_horaire) || 0, (qualification || '').trim() || null]);
   res.json({ id: rows[0].id });
 });
 
