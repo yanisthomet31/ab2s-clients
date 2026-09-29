@@ -947,6 +947,8 @@ input[type="file"]::file-selector-button:hover { background: var(--bg-2); }
 .map-legend { display: flex; gap: 16px; color: var(--text2); font-size: 13px; }
 .map-legend span { display: inline-flex; align-items: center; gap: 7px; }
 .map-legend i { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.map-legend i.legend-region { width: 16px; height: 10px; border-radius: 3px; border: 2px solid var(--accent); background: var(--accent-50); }
+.header-actions .map-legend { margin-right: 8px; }
 
 /* ─── LOGIN ──────────────────────────────────────────── */
 .login-body {

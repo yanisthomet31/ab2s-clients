@@ -1271,6 +1271,38 @@ let carteClientsMap = null;
 let carteTiles = null;
 let carteClientsMarkers = [];
 
+// ─── Région Occitanie : contour + voile léger sur le reste de la carte ───
+let occitanieLayer = null;
+let occitanieMask = null;
+
+async function drawOccitanie() {
+  const geo = await fetch('/assets/occitanie.geojson').then(r => r.json()).catch(() => null);
+  if (!geo || !carteClientsMap) return;
+  const world = [[-89, -179], [-89, 179], [89, 179], [89, -179]];
+  const holes = geo.features[0].geometry.coordinates.map(poly => poly[0].map(([lng, lat]) => [lat, lng]));
+  occitanieMask = L.polygon([world, ...holes], { pane: 'region', stroke: false, interactive: false }).addTo(carteClientsMap);
+  occitanieLayer = L.geoJSON(geo, { pane: 'region', interactive: false }).addTo(carteClientsMap);
+  styleOccitanie();
+  if (state.mapView !== 'france') carteClientsMap.fitBounds(occitanieLayer.getBounds(), { padding: [24, 24] });
+}
+
+function styleOccitanie() {
+  if (!occitanieLayer) return;
+  const dark = currentTheme() === 'dark';
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+  occitanieLayer.setStyle({ color: accent, weight: 2.5, opacity: .95, fillColor: accent, fillOpacity: dark ? .07 : .06 });
+  occitanieMask.setStyle({ fillColor: dark ? '#000' : '#1B2233', fillOpacity: dark ? .35 : .10 });
+}
+
+function setMapView(view) {
+  state.mapView = view;
+  document.getElementById('map-view-occitanie').classList.toggle('active', view !== 'france');
+  document.getElementById('map-view-france').classList.toggle('active', view === 'france');
+  if (!carteClientsMap) return;
+  if (view === 'france') carteClientsMap.flyTo([46.6, 2.5], 6, { duration: .8 });
+  else if (occitanieLayer) carteClientsMap.flyToBounds(occitanieLayer.getBounds(), { padding: [24, 24], duration: .8 });
+}
+
 // Fond OpenStreetMap (sans clé) ; le mode sombre est obtenu par un filtre CSS sur les tuiles
 function updateMapTiles() {
   if (!carteClientsMap) return;
@@ -1279,6 +1311,7 @@ function updateMapTiles() {
       attribution: '© OpenStreetMap', maxZoom: 19
     }).addTo(carteClientsMap);
   }
+  styleOccitanie();
   if (state.page === 'carte') loadCarteClients();
 }
 
@@ -1287,8 +1320,10 @@ async function loadCarteClients() {
   const clients = await api('/api/clients-map') || [];
 
   if (!carteClientsMap) {
-    carteClientsMap = L.map('carte-clients-map').setView([46.6, 2.5], 6);
+    carteClientsMap = L.map('carte-clients-map').setView([43.7, 2.2], 7);
+    carteClientsMap.createPane('region').style.zIndex = 350; // sous les marqueurs
     updateMapTiles();
+    drawOccitanie();
   }
 
   carteClientsMarkers.forEach(m => carteClientsMap.removeLayer(m));
