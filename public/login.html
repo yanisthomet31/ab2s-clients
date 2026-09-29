@@ -5,28 +5,40 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AB2S Sécurité — Connexion</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap">
 <link rel="stylesheet" href="style.css">
 </head>
-<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--bg)">
+<body class="login-body">
 
-<div class="card" style="width:340px;padding:32px 28px;text-align:center">
-  <img src="assets/logo.png" alt="AB2S Sécurité" style="width:90px;margin-bottom:16px">
-  <h2 style="color:var(--blue);margin-bottom:4px">Base de données Clients</h2>
-  <p style="color:var(--text2);font-size:13px;margin-bottom:20px">AB2S Sécurité</p>
+<div class="login-bg">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+</div>
 
-  <form id="login-form" style="display:flex;flex-direction:column;gap:12px;text-align:left">
-    <div class="form-group">
-      <label>Identifiant</label>
-      <input type="text" id="l-username" placeholder="abder / yanis / samar" autocomplete="username">
-    </div>
-    <div class="form-group">
-      <label>Mot de passe</label>
-      <input type="password" id="l-password" placeholder="••••••••" autocomplete="current-password">
-    </div>
-    <button type="submit" class="btn-primary" style="margin-top:8px">Se connecter</button>
-  </form>
+<div>
+  <div class="login-card">
+    <div class="login-logo"><img src="assets/logo.png" alt="AB2S Sécurité"></div>
+    <h1>Bon retour parmi nous</h1>
+    <p class="page-sub">Connectez-vous à la base clients AB2S Sécurité</p>
 
-  <p id="login-error" style="color:var(--red);font-size:13px;margin-top:14px;display:none"></p>
+    <form id="login-form" class="login-form">
+      <div class="form-group">
+        <label for="l-username">Identifiant</label>
+        <input type="text" id="l-username" placeholder="Votre identifiant" autocomplete="username" autofocus>
+      </div>
+      <div class="form-group">
+        <label for="l-password">Mot de passe</label>
+        <input type="password" id="l-password" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-primary" id="login-btn">Se connecter</button>
+    </form>
+
+    <p id="login-error" class="login-error"></p>
+  </div>
+  <p class="login-foot">© AB2S Sécurité — Accès réservé</p>
 </div>
 
 <script src="login.js"></script>

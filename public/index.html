@@ -5,40 +5,89 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AB2S Sécurité — Base de données Clients</title>
 <link rel="icon" type="image/png" href="assets/logo.png">
-<link rel="stylesheet" href="style.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
 </head>
 <body>
 
+<!-- ICÔNES (style Lucide) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-dashboard" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></symbol>
+  <symbol id="i-building" viewBox="0 0 24 24"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4M10 10h4M10 14h4M10 18h4"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></symbol>
+  <symbol id="i-map" viewBox="0 0 24 24"><path d="M14.1 5.55a2 2 0 0 0 1.8 0l3.66-1.83A1 1 0 0 1 21 4.62v12.76a1 1 0 0 1-.55.9l-4.55 2.27a2 2 0 0 1-1.8 0l-4.2-2.1a2 2 0 0 0-1.8 0l-3.66 1.83A1 1 0 0 1 3 19.38V6.62a1 1 0 0 1 .55-.9L8.1 3.45a2 2 0 0 1 1.8 0z"/><path d="M15 5.76v15M9 3.24v15"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5M12 15V3"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6M15.5 7.5l3 3L22 7l-3-3"/></symbol>
+  <symbol id="i-logout" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5M21 12H9"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7.5"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-euro" viewBox="0 0 24 24"><path d="M4 10h12M4 14h9"/><path d="M19 6a7.7 7.7 0 0 0-5.2-2A7.9 7.9 0 0 0 6 12c0 4.4 3.5 8 7.8 8 2 0 3.8-.8 5.2-2"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M12 7v5l4 2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8" rx="1"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></symbol>
+  <symbol id="i-mail" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 16h5v5"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/></symbol>
+  <symbol id="i-clipboard" viewBox="0 0 24 24"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-note" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+  <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></symbol>
+  <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+</svg>
+
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="sidebar-logo">
-    <img src="assets/logo.png" alt="AB2S Sécurité" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='flex'">
-    <div id="logo-fallback" class="logo-fallback" style="display:none">
-      <span class="logo-fb-title">AB2S</span>
-      <span class="logo-fb-sub">SÉCURITÉ</span>
+    <div class="logo-tile">
+      <img src="assets/logo.png" alt="AB2S Sécurité" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'">
+      <span id="logo-fallback" class="logo-fallback" style="display:none">AB2S</span>
+    </div>
+    <div class="brand-text">
+      <span class="brand-name">AB2S Sécurité</span>
+      <span class="brand-sub">Base clients</span>
     </div>
   </div>
+
+  <div class="sidebar-section">Navigation</div>
   <nav class="sidebar-nav">
     <a class="nav-item active" data-tab="dashboard" onclick="showTab('dashboard')">
-      <span class="nav-icon">📊</span><span>Tableau de bord</span>
+      <span class="nav-icon"><svg class="i"><use href="#i-dashboard"/></svg></span><span>Tableau de bord</span>
     </a>
     <a class="nav-item" data-tab="clients" onclick="showTab('clients')">
-      <span class="nav-icon">🏢</span><span>Clients</span>
+      <span class="nav-icon"><svg class="i"><use href="#i-building"/></svg></span><span>Clients</span>
     </a>
     <a class="nav-item" data-tab="sites" onclick="showTab('sites')">
-      <span class="nav-icon">📍</span><span>Sites</span>
+      <span class="nav-icon"><svg class="i"><use href="#i-pin"/></svg></span><span>Sites</span>
     </a>
     <a class="nav-item" data-tab="carte" onclick="showTab('carte')">
-      <span class="nav-icon">🗺️</span><span>Carte des clients</span>
+      <span class="nav-icon"><svg class="i"><use href="#i-map"/></svg></span><span>Carte des clients</span>
     </a>
   </nav>
+
   <div class="sidebar-footer">
-    <button class="btn-export" onclick="exportCSV()">⬇ Exporter CSV</button>
-    <div class="sidebar-version" id="connected-as">Connecté</div>
-    <button class="btn-export" onclick="changePassword()">🔑 Changer mon mot de passe</button>
-    <button class="btn-export" onclick="logout()">🚪 Déconnexion</button>
+    <button class="btn-export" onclick="exportCSV()"><svg class="i"><use href="#i-download"/></svg><span>Exporter en CSV</span></button>
+    <button class="btn-export" onclick="changePassword()"><svg class="i"><use href="#i-key"/></svg><span>Mot de passe</span></button>
+    <button class="btn-export danger" onclick="logout()"><svg class="i"><use href="#i-logout"/></svg><span>Déconnexion</span></button>
+    <div class="user-chip mt8">
+      <div class="user-avatar" id="user-avatar">·</div>
+      <div>
+        <div class="sidebar-version" id="connected-as">Connecté</div>
+        <div class="user-role">Session active</div>
+      </div>
+    </div>
   </div>
 </aside>
 
@@ -48,29 +97,55 @@
   <!-- ═══════════════════ DASHBOARD ═══════════════════ -->
   <section id="tab-dashboard" class="tab-section active">
     <div class="page-header">
-      <div><h1>Tableau de bord</h1></div>
-      <button class="btn-primary" onclick="openClientModal()">+ Nouveau client</button>
+      <div>
+        <p class="eyebrow" id="dash-date"></p>
+        <h1 id="dash-greeting">Bonjour</h1>
+        <p class="page-sub">Voici l'essentiel de votre portefeuille clients.</p>
+      </div>
+      <button class="btn-primary" onclick="openClientModal()"><svg class="i"><use href="#i-plus"/></svg>Nouveau client</button>
     </div>
     <div class="kpi-grid">
       <div class="kpi-card blue">
+        <div class="kpi-icon"><svg class="i"><use href="#i-building"/></svg></div>
         <div class="kpi-label">Clients actifs</div>
         <div class="kpi-value" id="k-clients">—</div>
-        <div class="kpi-icon">🏢</div>
       </div>
       <div class="kpi-card orange">
+        <div class="kpi-icon"><svg class="i"><use href="#i-pin"/></svg></div>
         <div class="kpi-label">Sites surveillés</div>
         <div class="kpi-value" id="k-sites">—</div>
-        <div class="kpi-icon">📍</div>
       </div>
       <div class="kpi-card teal">
+        <div class="kpi-icon"><svg class="i"><use href="#i-file"/></svg></div>
         <div class="kpi-label">Documents</div>
         <div class="kpi-value" id="k-documents">—</div>
-        <div class="kpi-icon">📄</div>
       </div>
       <div class="kpi-card red">
-        <div class="kpi-label">Échéances (30j)</div>
+        <div class="kpi-icon"><svg class="i"><use href="#i-clock"/></svg></div>
+        <div class="kpi-label">Échéances sous 30 jours</div>
         <div class="kpi-value" id="k-echeances">—</div>
-        <div class="kpi-icon">⏰</div>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3>Contrats à échéance</h3>
+            <div class="card-sub">Fins de contrat dans les 90 prochains jours</div>
+          </div>
+        </div>
+        <div id="dash-echeances" class="list"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3>Activité récente</h3>
+            <div class="card-sub">Dernières fiches créées ou modifiées</div>
+          </div>
+          <a class="link" onclick="showTab('clients')">Tout voir <svg class="i i-sm"><use href="#i-arrow"/></svg></a>
+        </div>
+        <div id="dash-recents" class="list"></div>
       </div>
     </div>
   </section>
@@ -82,47 +157,66 @@
         <h1>Clients</h1>
         <p class="page-sub" id="clients-count">Chargement…</p>
       </div>
-      <button class="btn-primary" onclick="openClientModal()">+ Nouveau client</button>
+      <button class="btn-primary" onclick="openClientModal()"><svg class="i"><use href="#i-plus"/></svg>Nouveau client</button>
     </div>
-    <div class="modal-tabs" style="background:none;border-bottom:2px solid var(--border);padding:0 0 0 2px;margin-bottom:12px">
-      <button class="modal-tab active" id="client-type-tous" onclick="filterClientsType('')">Tous</button>
-      <button class="modal-tab" id="client-type-regulier" onclick="filterClientsType('Régulier')">🔒 Réguliers</button>
-      <button class="modal-tab" id="client-type-occasionnel" onclick="filterClientsType('Occasionnel')">📋 Occasionnels</button>
+    <div class="toolbar">
+      <div class="seg">
+        <button class="seg-btn active" id="client-type-tous" onclick="filterClientsType('')">Tous</button>
+        <button class="seg-btn" id="client-type-regulier" onclick="filterClientsType('Régulier')"><svg class="i i-sm"><use href="#i-shield"/></svg>Réguliers</button>
+        <button class="seg-btn" id="client-type-occasionnel" onclick="filterClientsType('Occasionnel')"><svg class="i i-sm"><use href="#i-clipboard"/></svg>Occasionnels</button>
+      </div>
+      <div class="search-box">
+        <svg class="i"><use href="#i-search"/></svg>
+        <input type="search" id="search-input" placeholder="Rechercher une société, un contact, une ville…" oninput="loadClients()" class="search-input">
+      </div>
     </div>
-    <div class="filters-bar card">
-      <input type="search" id="search-input" placeholder="🔍 Rechercher (société, contact, ville…)" oninput="loadClients()" class="search-input">
-    </div>
-    <div class="card mt12">
-      <table class="table" id="clients-table">
-        <thead><tr>
-          <th>Société</th><th>Type</th><th>Catégorie</th><th>Contact</th><th>Ville</th>
-          <th>Type de prestation</th><th>Statut</th><th>Fin de contrat</th>
-        </tr></thead>
-        <tbody id="clients-body"></tbody>
-      </table>
+    <div class="card" style="padding:0">
+      <div class="table-wrap">
+        <table class="table" id="clients-table">
+          <thead><tr>
+            <th>Société</th><th>Type</th><th>Catégorie</th><th>Contact</th><th>Ville</th>
+            <th>Prestation</th><th>Statut</th><th>Fin de contrat</th>
+          </tr></thead>
+          <tbody id="clients-body"></tbody>
+        </table>
+      </div>
       <div id="clients-empty" class="empty-state" style="display:none">
-        <div class="empty-icon">🏢</div>
+        <div class="empty-icon"><svg class="i i-lg"><use href="#i-building"/></svg></div>
         <p>Aucun client trouvé</p>
-        <button class="btn-primary mt8" onclick="openClientModal()">Ajouter le premier client</button>
+        <button class="btn-primary mt12" onclick="openClientModal()"><svg class="i"><use href="#i-plus"/></svg>Ajouter un client</button>
       </div>
     </div>
   </section>
 
   <!-- ═══════════════════ SITES (vue globale) ═══════════════════ -->
   <section id="tab-sites" class="tab-section">
-    <div class="page-header"><h1>Sites</h1></div>
+    <div class="page-header">
+      <div>
+        <h1>Sites</h1>
+        <p class="page-sub">Tous les sites surveillés, regroupés par client.</p>
+      </div>
+    </div>
     <div id="sites-global-list"></div>
-    <div id="sites-global-empty" class="empty-state" style="display:none">
-      <div class="empty-icon">📍</div>
+    <div id="sites-global-empty" class="empty-state card" style="display:none">
+      <div class="empty-icon"><svg class="i i-lg"><use href="#i-pin"/></svg></div>
       <p>Aucun site enregistré pour le moment</p>
     </div>
   </section>
 
-  <!-- ═══════════════════ CARTE DES SITES ═══════════════════ -->
+  <!-- ═══════════════════ CARTE DES CLIENTS ═══════════════════ -->
   <section id="tab-carte" class="tab-section">
-    <div class="page-header"><h1>Carte des clients</h1></div>
-    <div class="card">
-      <div id="carte-clients-map" style="height:520px;border-radius:var(--radius);overflow:hidden"></div>
+    <div class="page-header">
+      <div>
+        <h1>Carte des clients</h1>
+        <p class="page-sub">Répartition géographique de votre portefeuille.</p>
+      </div>
+      <div class="map-legend">
+        <span><i style="background:#3A4C96"></i>Réguliers</span>
+        <span><i style="background:#E0915E"></i>Occasionnels</span>
+      </div>
+    </div>
+    <div class="card map-card">
+      <div id="carte-clients-map"></div>
     </div>
   </section>
 
@@ -134,17 +228,18 @@
 <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
   <div class="modal" id="modal-client">
     <div class="modal-header">
+      <div class="modal-header-icon"><svg class="i"><use href="#i-building"/></svg></div>
       <h2 id="modal-title">Nouveau client</h2>
-      <button class="modal-close" onclick="closeClientModal()">✕</button>
+      <button class="modal-close" onclick="closeClientModal()" aria-label="Fermer"><svg class="i i-sm"><use href="#i-x"/></svg></button>
     </div>
 
     <div class="modal-tabs">
-      <button class="modal-tab active" onclick="switchModalTab('infos',this)">📋 Informations</button>
-      <button class="modal-tab" onclick="switchModalTab('contacts',this)">📇 Contacts</button>
-      <button class="modal-tab" onclick="switchModalTab('sites',this)">📍 Sites</button>
-      <button class="modal-tab" onclick="switchModalTab('tarifs',this)">💶 Tarifs</button>
-      <button class="modal-tab" onclick="switchModalTab('documents',this)">📄 Documents</button>
-      <button class="modal-tab" onclick="switchModalTab('historique',this)">📝 Historique</button>
+      <button class="modal-tab active" onclick="switchModalTab('infos',this)"><svg class="i"><use href="#i-info"/></svg>Informations</button>
+      <button class="modal-tab" onclick="switchModalTab('contacts',this)"><svg class="i"><use href="#i-users"/></svg>Contacts</button>
+      <button class="modal-tab" onclick="switchModalTab('sites',this)"><svg class="i"><use href="#i-pin"/></svg>Sites</button>
+      <button class="modal-tab" onclick="switchModalTab('tarifs',this)"><svg class="i"><use href="#i-euro"/></svg>Tarifs</button>
+      <button class="modal-tab" onclick="switchModalTab('documents',this)"><svg class="i"><use href="#i-file"/></svg>Documents</button>
+      <button class="modal-tab" onclick="switchModalTab('historique',this)"><svg class="i"><use href="#i-history"/></svg>Historique</button>
     </div>
 
     <!-- Tab Infos -->
@@ -167,9 +262,9 @@
           <div class="form-group flex-1">
             <label>Logo de l'entreprise cliente</label>
             <div style="display:flex;align-items:center;gap:10px">
-              <img id="client-logo-preview" src="" alt="" style="display:none;width:56px;height:56px;object-fit:contain;border-radius:8px;border:1px solid var(--border);background:#fff">
+              <img id="client-logo-preview" src="" alt="" style="display:none;width:52px;height:52px;object-fit:contain;border-radius:12px;border:1px solid var(--border);background:#fff;padding:4px;box-shadow:var(--shadow-xs)">
               <input type="file" id="f-logo-file" accept="image/*" style="flex:1" onchange="uploadClientLogoIfSelected()">
-              <button type="button" class="btn-ghost btn-sm" onclick="removeClientLogo()">✕</button>
+              <button type="button" class="btn-ghost btn-sm" onclick="removeClientLogo()" title="Retirer le logo"><svg class="i i-sm"><use href="#i-x"/></svg></button>
             </div>
           </div>
         </div>
@@ -184,8 +279,8 @@
           <div class="form-group flex-1">
             <label>Type de client</label>
             <select id="f-type-client">
-              <option value="Régulier">🔒 Régulier (contrat fixe)</option>
-              <option value="Occasionnel">📋 Occasionnel (sur devis)</option>
+              <option value="Régulier">Régulier (contrat fixe)</option>
+              <option value="Occasionnel">Occasionnel (sur devis)</option>
             </select>
           </div>
           <div class="form-group flex-1">
@@ -209,7 +304,7 @@
           </div>
         </div>
 
-        <div class="form-section-title mt12">Informations légales</div>
+        <div class="form-section-title mt16">Informations légales</div>
         <div class="form-row">
           <div class="form-group flex-1">
             <label>SIRET</label>
@@ -229,7 +324,7 @@
           </div>
         </div>
 
-        <div class="form-section-title mt12">Contact</div>
+        <div class="form-section-title mt16">Contact principal</div>
         <div class="form-row">
           <div class="form-group flex-1">
             <label>Nom du contact</label>
@@ -245,7 +340,7 @@
           </div>
         </div>
 
-        <div class="form-section-title mt12">Contrat</div>
+        <div class="form-section-title mt16">Contrat</div>
         <div class="form-row">
           <div class="form-group flex-1">
             <label>Début de contrat</label>
@@ -254,8 +349,8 @@
           <div class="form-group flex-1">
             <label>Fin de contrat</label>
             <input type="date" id="f-date-fin">
-            <label style="display:flex;align-items:center;gap:6px;margin-top:6px;font-weight:400;font-size:12.5px">
-              <input type="checkbox" id="f-tacite-reconduction" onchange="toggleTaciteReconduction()" style="width:auto">
+            <label class="check-label">
+              <input type="checkbox" id="f-tacite-reconduction" onchange="toggleTaciteReconduction()">
               Tacite reconduction (pas de date de fin)
             </label>
           </div>
@@ -289,34 +384,34 @@
     <!-- Tab Contacts -->
     <div id="mtab-contacts" class="modal-tab-content">
       <div class="activite-add">
-        <input type="text" id="new-contact-nom" placeholder="Nom Prénom…" class="search-input">
-        <input type="text" id="new-contact-poste" placeholder="Poste…" class="filter-select" style="max-width:140px">
-        <input type="tel" id="new-contact-telephone" placeholder="Téléphone…" class="filter-select" style="max-width:150px">
-        <input type="email" id="new-contact-email" placeholder="Email…" class="search-input">
-        <button class="btn-primary" onclick="addContact()">Ajouter</button>
+        <input type="text" id="new-contact-nom" placeholder="Nom Prénom" class="search-input">
+        <input type="text" id="new-contact-poste" placeholder="Poste" class="filter-select" style="max-width:140px">
+        <input type="tel" id="new-contact-telephone" placeholder="Téléphone" class="filter-select" style="max-width:150px">
+        <input type="email" id="new-contact-email" placeholder="Email" class="search-input">
+        <button class="btn-primary" onclick="addContact()"><svg class="i"><use href="#i-plus"/></svg>Ajouter</button>
       </div>
-      <div id="contacts-list" class="mt12"></div>
+      <div id="contacts-list"></div>
     </div>
 
     <!-- Tab Sites -->
     <div id="mtab-sites" class="modal-tab-content">
       <div class="activite-add">
-        <input type="text" id="new-site-nom" placeholder="Nom du site…" class="search-input">
-        <input type="text" id="new-site-code" placeholder="Code site…" class="filter-select" style="max-width:140px">
-        <input type="text" id="new-site-adresse" placeholder="Adresse du site…" class="search-input">
-        <button class="btn-primary" onclick="addSite()">Ajouter le site</button>
+        <input type="text" id="new-site-nom" placeholder="Nom du site" class="search-input">
+        <input type="text" id="new-site-code" placeholder="Code site" class="filter-select" style="max-width:140px">
+        <input type="text" id="new-site-adresse" placeholder="Adresse du site" class="search-input">
+        <button class="btn-primary" onclick="addSite()"><svg class="i"><use href="#i-plus"/></svg>Ajouter</button>
       </div>
-      <div id="sites-list" class="mt12"></div>
+      <div id="sites-list"></div>
     </div>
 
     <!-- Tab Tarifs -->
     <div id="mtab-tarifs" class="modal-tab-content">
       <div class="activite-add">
-        <input type="number" id="new-tarif-annee" placeholder="Année…" class="filter-select" style="max-width:110px">
-        <input type="number" id="new-tarif-taux" placeholder="Taux horaire (€)…" step="0.01" min="0" class="search-input">
-        <button class="btn-primary" onclick="addTarif()">Ajouter</button>
+        <input type="number" id="new-tarif-annee" placeholder="Année" class="filter-select" style="max-width:110px">
+        <input type="number" id="new-tarif-taux" placeholder="Taux horaire (€)" step="0.01" min="0" class="search-input">
+        <button class="btn-primary" onclick="addTarif()"><svg class="i"><use href="#i-plus"/></svg>Ajouter</button>
       </div>
-      <div id="tarifs-list" class="mt12"></div>
+      <div id="tarifs-list"></div>
     </div>
 
     <!-- Tab Documents -->
@@ -327,9 +422,9 @@
           <option value="facture">Facture</option><option value="autre">Autre</option>
         </select>
         <input type="file" id="new-doc-file" class="search-input">
-        <button class="btn-primary" onclick="uploadDocument()">Envoyer</button>
+        <button class="btn-primary" onclick="uploadDocument()"><svg class="i"><use href="#i-download" style="transform:rotate(180deg);transform-origin:center"/></svg>Envoyer</button>
       </div>
-      <div id="documents-list" class="mt12"></div>
+      <div id="documents-list"></div>
     </div>
 
     <!-- Tab Historique -->
@@ -338,17 +433,18 @@
         <select id="new-hist-type" class="filter-select">
           <option>Échange</option><option>Incident</option><option>Renouvellement</option><option>Note</option>
         </select>
-        <input type="text" id="new-hist-desc" placeholder="Description…" class="search-input">
-        <button class="btn-primary" onclick="addHistorique()">Ajouter</button>
+        <input type="text" id="new-hist-desc" placeholder="Description" class="search-input">
+        <button class="btn-primary" onclick="addHistorique()"><svg class="i"><use href="#i-plus"/></svg>Ajouter</button>
       </div>
-      <div id="historique-list" class="mt12"></div>
+      <div id="historique-list"></div>
     </div>
 
     <div class="modal-footer">
+      <button class="btn-danger" id="btn-delete" onclick="deleteClient()" style="display:none"><svg class="i i-sm"><use href="#i-trash"/></svg>Supprimer</button>
+      <span class="spacer"></span>
+      <button class="btn-ghost" id="btn-fiche-pdf" onclick="ouvrirFichePDF()" style="display:none"><svg class="i i-sm"><use href="#i-printer"/></svg>Fiche PDF</button>
       <button class="btn-ghost" onclick="closeClientModal()">Annuler</button>
-      <button class="btn-danger" id="btn-delete" onclick="deleteClient()" style="display:none">🗑 Supprimer</button>
-      <button class="btn-ghost" id="btn-fiche-pdf" onclick="ouvrirFichePDF()" style="display:none">🖨️ Générer la fiche PDF</button>
-      <button class="btn-primary" onclick="saveClient()">💾 Enregistrer</button>
+      <button class="btn-primary" onclick="saveClient()"><svg class="i i-sm"><use href="#i-check"/></svg>Enregistrer</button>
     </div>
   </div>
 </div>

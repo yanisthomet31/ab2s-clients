@@ -9,7 +9,14 @@ let currentClientId = null;
 document.addEventListener('DOMContentLoaded', async () => {
   const me = await api('/api/me');
   if (!me || !me.nom) { window.location.href = '/login.html'; return; }
-  document.getElementById('connected-as').textContent = `Connecté : ${me.nom}`;
+  document.getElementById('connected-as').textContent = me.nom;
+  document.getElementById('user-avatar').textContent = me.nom.trim().charAt(0);
+  const h = new Date().getHours();
+  document.getElementById('dash-greeting').textContent = `${h >= 18 || h < 5 ? 'Bonsoir' : 'Bonjour'} ${me.nom}`;
+  document.getElementById('dash-date').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && document.getElementById('modal-overlay').classList.contains('open')) closeClientModal();
+  });
 
   loadDashboard();
   loadClients();
@@ -28,7 +35,7 @@ async function changePassword() {
   const confirmation = prompt('Confirmez le nouveau mot de passe :');
   if (nouveau !== confirmation) { toast('Les mots de passe ne correspondent pas', true); return; }
   const r = await api('/api/change-password', { method: 'POST', body: { ancien, nouveau } });
-  if (r && r.ok) toast('Mot de passe changé ✔');
+  if (r && r.ok) toast('Mot de passe changé');
   else toast((r && r.error) || 'Erreur', true);
 }
 
@@ -67,12 +74,68 @@ async function api(path, opts = {}) {
 
 // ─── DASHBOARD ────────────────────────────────────────
 async function loadDashboard() {
-  const kpi = await api('/api/kpi');
-  if (!kpi) return;
-  document.getElementById('k-clients').textContent   = kpi.clients_actifs;
-  document.getElementById('k-sites').textContent      = kpi.sites;
-  document.getElementById('k-documents').textContent  = kpi.documents;
-  document.getElementById('k-echeances').textContent  = kpi.echeances_30j;
+  const [kpi, clients] = await Promise.all([api('/api/kpi'), api('/api/clients')]);
+  if (kpi) {
+    countUp('k-clients',   kpi.clients_actifs);
+    countUp('k-sites',     kpi.sites);
+    countUp('k-documents', kpi.documents);
+    countUp('k-echeances', kpi.echeances_30j);
+  }
+  if (clients) renderDashLists(clients);
+}
+
+function countUp(id, target) {
+  const el = document.getElementById(id);
+  const from = parseInt(el.textContent) || 0;
+  if (from === target || matchMedia('(prefers-reduced-motion: reduce)').matches) { el.textContent = target; return; }
+  const start = performance.now(), dur = 700;
+  const step = now => {
+    const t = Math.min(1, (now - start) / dur);
+    el.textContent = Math.round(from + (target - from) * (1 - Math.pow(1 - t, 3)));
+    if (t < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function renderDashLists(clients) {
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const echeances = clients
+    .filter(c => c.date_fin_contrat && !c.tacite_reconduction && c.statut !== 'Terminé')
+    .map(c => {
+      const fin = new Date(c.date_fin_contrat); fin.setHours(0, 0, 0, 0);
+      return { ...c, jours: Math.round((fin - today) / 86400000) };
+    })
+    .filter(c => c.jours >= 0 && c.jours <= 90)
+    .sort((a, b) => a.jours - b.jours)
+    .slice(0, 6);
+
+  const elE = document.getElementById('dash-echeances');
+  elE.innerHTML = echeances.length ? echeances.map((c, i) => `
+    <div class="list-row" style="animation-delay:${i * 40}ms" onclick="openClientModal(${c.id})">
+      ${clientAvatar(c)}
+      <div class="list-main">
+        <div class="list-title">${esc(c.societe)}</div>
+        <div class="list-meta">Fin le ${formatDateShort(c.date_fin_contrat)}</div>
+      </div>
+      <span class="pill ${c.jours <= 30 ? 'pill-danger' : c.jours <= 60 ? 'pill-warning' : 'pill-neutral'}">
+        ${c.jours === 0 ? "Aujourd'hui" : `J-${c.jours}`}
+      </span>
+    </div>
+  `).join('') : emptyBlock('check', 'Aucune échéance dans les 90 jours');
+
+  const elR = document.getElementById('dash-recents');
+  const recents = clients.slice(0, 6);
+  elR.innerHTML = recents.length ? recents.map((c, i) => `
+    <div class="list-row" style="animation-delay:${i * 40}ms" onclick="openClientModal(${c.id})">
+      ${clientAvatar(c)}
+      <div class="list-main">
+        <div class="list-title">${esc(c.societe)}</div>
+        <div class="list-meta">${[c.ville, c.type_prestation].filter(Boolean).map(esc).join(' · ') || '—'}</div>
+      </div>
+      <span class="list-meta">${timeAgo(c.updated_at)}</span>
+      <span class="row-arrow"><svg class="i i-sm"><use href="#i-chevron"/></svg></span>
+    </div>
+  `).join('') : emptyBlock('building', 'Aucun client pour le moment');
 }
 
 // ─── CLIENTS ──────────────────────────────────────────
@@ -104,16 +167,23 @@ async function loadClients() {
     return;
   }
   empty.style.display = 'none';
-  tbody.innerHTML = data.map(c => `
-    <tr onclick="openClientModal(${c.id})">
-      <td><strong>${c.societe}</strong></td>
-      <td><span class="segment-badge">${c.type_client === 'Occasionnel' ? '📋 Occasionnel' : '🔒 Régulier'}</span></td>
-      <td>${c.categorie_client || '—'}</td>
-      <td>${c.contact_nom || '—'}</td>
-      <td>${c.ville || '—'}</td>
-      <td>${c.type_prestation || '—'}</td>
-      <td><span class="etape-badge etape-${c.statut === 'Actif' ? 'Gagné' : c.statut === 'Suspendu' ? 'Négociation' : 'Perdu'}">${c.statut}</span></td>
-      <td>${c.tacite_reconduction ? '🔄 Tacite reconduction' : (c.date_fin_contrat ? formatDateShort(c.date_fin_contrat) : '—')}</td>
+  tbody.innerHTML = data.map((c, i) => `
+    <tr onclick="openClientModal(${c.id})" style="animation-delay:${Math.min(i, 15) * 25}ms">
+      <td>
+        <div class="cell-client">
+          ${clientAvatar(c, 'sm')}
+          <div><strong>${esc(c.societe)}</strong>${c.code_client ? `<div class="cell-sub">${esc(c.code_client)}</div>` : ''}</div>
+        </div>
+      </td>
+      <td>${typeClientPill(c.type_client)}</td>
+      <td>${esc(c.categorie_client) || '<span class="muted">—</span>'}</td>
+      <td>${esc(c.contact_nom) || '<span class="muted">—</span>'}</td>
+      <td>${esc(c.ville) || '<span class="muted">—</span>'}</td>
+      <td>${esc(c.type_prestation) || '<span class="muted">—</span>'}</td>
+      <td>${statutPill(c.statut)}</td>
+      <td>${c.tacite_reconduction
+        ? `<span class="pill pill-info">${ic('refresh')}Tacite</span>`
+        : (c.date_fin_contrat ? formatDateShort(c.date_fin_contrat) : '<span class="muted">—</span>')}</td>
     </tr>
   `).join('');
 }
@@ -170,11 +240,11 @@ async function openClientModal(id = null) {
     document.getElementById('f-categorie-client').value = 'Autres';
     toggleTaciteReconduction();
     showClientLogoPreview(null);
-    document.getElementById('sites-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des sites</div>';
-    document.getElementById('documents-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des documents</div>';
-    document.getElementById('historique-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter un historique</div>';
-    document.getElementById('contacts-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des contacts</div>';
-    document.getElementById('tarifs-list').innerHTML = '<div class="empty-state">Enregistrez le client pour ajouter des tarifs</div>';
+    document.getElementById('sites-list').innerHTML = emptyBlock('pin', 'Enregistrez le client pour ajouter des sites');
+    document.getElementById('documents-list').innerHTML = emptyBlock('file', 'Enregistrez le client pour ajouter des documents');
+    document.getElementById('historique-list').innerHTML = emptyBlock('history', 'Enregistrez le client pour ajouter un historique');
+    document.getElementById('contacts-list').innerHTML = emptyBlock('users', 'Enregistrez le client pour ajouter des contacts');
+    document.getElementById('tarifs-list').innerHTML = emptyBlock('euro', 'Enregistrez le client pour ajouter des tarifs');
   }
 }
 
@@ -199,7 +269,7 @@ async function uploadClientLogoIfSelected() {
   if (r.status === 401) { window.location.href = '/login.html'; return; }
   fileInput.value = '';
   showClientLogoPreview(currentClientId);
-  toast('Logo mis à jour ✔');
+  toast('Logo mis à jour');
 }
 
 async function removeClientLogo() {
@@ -218,7 +288,9 @@ function toggleTaciteReconduction() {
 }
 
 function closeClientModal() {
-  document.getElementById('modal-overlay').classList.remove('open');
+  const overlay = document.getElementById('modal-overlay');
+  overlay.classList.add('closing');
+  setTimeout(() => overlay.classList.remove('open', 'closing'), 180);
   currentClientId = null;
 }
 
@@ -268,7 +340,7 @@ async function saveClient() {
 
   if (currentClientId) {
     await api(`/api/clients/${currentClientId}`, { method: 'PUT', body });
-    toast('Client mis à jour ✔');
+    toast('Client mis à jour');
   } else {
     const r = await api('/api/clients', { method: 'POST', body });
     if (r) {
@@ -280,7 +352,7 @@ async function saveClient() {
       document.getElementById('historique-list').innerHTML = '';
       renderSites([]); renderDocuments([]); renderHistorique([]);
     }
-    toast('Client créé ✔');
+    toast('Client créé');
   }
   loadClients();
   loadDashboard();
@@ -303,22 +375,22 @@ async function deleteClient() {
 // ─── CONTACTS (dans le modal) ──────────────────────────
 function renderContacts(contacts) {
   const el = document.getElementById('contacts-list');
-  if (!contacts.length) { el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:24px">Aucun contact enregistré</div>'; return; }
+  if (!contacts.length) { el.innerHTML = emptyBlock('users', 'Aucun contact enregistré'); return; }
   el.innerHTML = contacts.map(c => `
     <div class="activite-item">
+      <div class="avatar">${initials(c.nom)}</div>
       <div class="activite-body">
         <div class="activite-top">
-          <span class="activite-type">${c.nom}</span>
-          ${c.poste ? `<span class="activite-auteur">— ${c.poste}</span>` : ''}
+          <span class="activite-type">${esc(c.nom)}</span>
+          ${c.poste ? `<span class="pill pill-neutral">${esc(c.poste)}</span>` : ''}
         </div>
         <div class="activite-desc">
-          ${c.telephone ? `<a href="tel:${c.telephone}" style="color:var(--blue);text-decoration:none">📞 ${c.telephone}</a>` : ''}
-          ${c.telephone && c.email ? ' · ' : ''}
-          ${c.email ? `<a href="mailto:${c.email}" style="color:var(--blue);text-decoration:none">✉️ ${c.email}</a>` : ''}
+          ${c.telephone ? `<a href="tel:${esc(c.telephone)}">${ic('phone')}${esc(c.telephone)}</a>` : ''}
+          ${c.email ? `<a href="mailto:${esc(c.email)}">${ic('mail')}${esc(c.email)}</a>` : ''}
           ${!c.telephone && !c.email ? '—' : ''}
         </div>
       </div>
-      <span class="activite-del" onclick="deleteContact(${c.id})">✕</span>
+      <span class="activite-del" onclick="deleteContact(${c.id})" title="Supprimer">${ic('trash')}</span>
     </div>
   `).join('');
 }
@@ -337,7 +409,7 @@ async function addContact() {
   document.getElementById('new-contact-email').value = '';
   const data = await api(`/api/clients/${currentClientId}`);
   renderContacts(data.contacts || []);
-  toast('Contact ajouté ✔');
+  toast('Contact ajouté');
 }
 
 async function deleteContact(id) {
@@ -350,18 +422,19 @@ async function deleteContact(id) {
 // ─── SITES (dans le modal) ─────────────────────────────
 function renderSites(sites) {
   const el = document.getElementById('sites-list');
-  if (!sites.length) { el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:24px">Aucun site enregistré</div>'; return; }
+  if (!sites.length) { el.innerHTML = emptyBlock('pin', 'Aucun site enregistré'); return; }
 
   el.innerHTML = sites.map(s => `
     <div class="activite-item">
-      <div class="activite-body" style="width:100%">
+      <div class="activite-icon">${ic('pin')}</div>
+      <div class="activite-body">
         <div class="activite-top">
-          <span class="activite-type">${s.nom_site}</span>
-          ${s.code_site ? `<span class="segment-badge">${s.code_site}</span>` : ''}
-          <span class="activite-auteur">${s.adresse_site || ''}</span>
+          <span class="activite-type">${esc(s.nom_site)}</span>
+          ${s.code_site ? `<span class="segment-badge">${esc(s.code_site)}</span>` : ''}
         </div>
+        <div class="activite-desc">${esc(s.adresse_site) || '—'}</div>
       </div>
-      <span class="activite-del" onclick="deleteSite(${s.id})">✕</span>
+      <span class="activite-del" onclick="deleteSite(${s.id})" title="Supprimer">${ic('trash')}</span>
     </div>
   `).join('');
 }
@@ -379,7 +452,7 @@ async function addSite() {
   const data = await api(`/api/clients/${currentClientId}`);
   renderSites(data.sites || []);
   loadDashboard();
-  toast('Site ajouté ✔');
+  toast('Site ajouté');
 }
 
 async function deleteSite(id) {
@@ -406,23 +479,26 @@ async function loadSitesGlobal() {
   list.innerHTML = clients.map(c => {
     const isOpen = sitesGlobalOpen.has(c.id);
     return `
-    <div class="card mt12">
-      <div class="card-header" style="cursor:pointer;user-select:none" onclick="toggleSitesGlobal(${c.id})">
-        <h3>${isOpen ? '▾' : '▸'} ${c.societe} <span style="color:var(--text2);font-weight:400;font-size:12.5px">(${c.sites.length} site${c.sites.length>1?'s':''})</span></h3>
+    <div class="card acc${isOpen ? ' open' : ''}">
+      <div class="acc-head" onclick="toggleSitesGlobal(${c.id})">
+        <span class="acc-chevron">${ic('chevron')}</span>
+        ${clientAvatar(c, 'sm')}
+        <span class="acc-title">${esc(c.societe)}</span>
+        <span class="pill pill-neutral">${c.sites.length} site${c.sites.length > 1 ? 's' : ''}</span>
       </div>
       ${isOpen ? `
-        <table class="table">
+        <div class="acc-body"><table class="table">
           <thead><tr><th>Site</th><th>Code</th><th>Adresse</th></tr></thead>
           <tbody>
             ${c.sites.map(s => `
               <tr onclick="openClientModal(${c.id})">
-                <td>${s.nom_site}</td>
-                <td>${s.code_site ? `<span class="segment-badge">${s.code_site}</span>` : '—'}</td>
-                <td>${s.adresse_site || '—'}</td>
+                <td><strong>${esc(s.nom_site)}</strong></td>
+                <td>${s.code_site ? `<span class="segment-badge">${esc(s.code_site)}</span>` : '<span class="muted">—</span>'}</td>
+                <td>${esc(s.adresse_site) || '<span class="muted">—</span>'}</td>
               </tr>
             `).join('')}
           </tbody>
-        </table>
+        </table></div>
       ` : ''}
     </div>
   `;
@@ -438,14 +514,15 @@ function toggleSitesGlobal(clientId) {
 // ─── TARIFS (dans le modal) ────────────────────────────
 function renderTarifs(tarifs) {
   const el = document.getElementById('tarifs-list');
-  if (!tarifs.length) { el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:24px">Aucun tarif enregistré</div>'; return; }
+  if (!tarifs.length) { el.innerHTML = emptyBlock('euro', 'Aucun tarif enregistré'); return; }
   el.innerHTML = tarifs.map(t => `
     <div class="activite-item">
+      <div class="activite-icon">${ic('euro')}</div>
       <div class="activite-body">
-        <span class="activite-type">${t.annee}</span>
-        <span class="activite-desc">${Number(t.taux_horaire).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € / heure</span>
+        <div class="activite-type">${esc(t.annee)}</div>
+        <div class="activite-desc">${Number(t.taux_horaire).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € / heure</div>
       </div>
-      <span class="activite-del" onclick="deleteTarif(${t.id})">✕</span>
+      <span class="activite-del" onclick="deleteTarif(${t.id})" title="Supprimer">${ic('trash')}</span>
     </div>
   `).join('');
 }
@@ -460,7 +537,7 @@ async function addTarif() {
   document.getElementById('new-tarif-taux').value = '';
   const data = await api(`/api/clients/${currentClientId}`);
   renderTarifs(data.tarifs || []);
-  toast('Tarif ajouté ✔');
+  toast('Tarif ajouté');
 }
 
 async function deleteTarif(id) {
@@ -473,21 +550,20 @@ async function deleteTarif(id) {
 // ─── DOCUMENTS (dans le modal) ─────────────────────────
 function renderDocuments(docs) {
   const el = document.getElementById('documents-list');
-  if (!docs.length) { el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:24px">Aucun document</div>'; return; }
-  const icons = { devis: '📃', contrat: '📑', facture: '🧾', autre: '📄' };
+  if (!docs.length) { el.innerHTML = emptyBlock('file', 'Aucun document'); return; }
+  const tones = { devis: 'pill-info', contrat: 'pill-success', facture: 'pill-accent', autre: 'pill-neutral' };
   el.innerHTML = docs.map(d => `
     <div class="activite-item">
-      <div class="activite-icon">${icons[d.type] || '📄'}</div>
+      <div class="activite-icon">${ic('file')}</div>
       <div class="activite-body">
         <div class="activite-top">
-          <span class="activite-type">${d.nom_fichier}</span>
-          <span class="activite-date">${formatDate(d.uploaded_at)}</span>
-          ${d.uploaded_by ? `<span class="activite-auteur">— ${d.uploaded_by}</span>` : ''}
+          <span class="activite-type">${esc(d.nom_fichier)}</span>
+          <span class="pill ${tones[d.type] || 'pill-neutral'}">${esc(d.type)}</span>
         </div>
-        <div class="activite-desc">${d.type} · ${(d.taille_octets/1024).toFixed(0)} Ko</div>
+        <div class="activite-desc">${formatDate(d.uploaded_at)}${d.uploaded_by ? ` · ${esc(d.uploaded_by)}` : ''} · ${(d.taille_octets/1024).toFixed(0)} Ko</div>
       </div>
-      <a class="btn-ghost btn-sm" href="/api/documents/${d.id}/download" target="_blank" rel="noopener">⬇</a>
-      <span class="activite-del" onclick="deleteDocument(${d.id})">✕</span>
+      <a class="btn-ghost btn-sm" href="/api/documents/${d.id}/download" target="_blank" rel="noopener" title="Télécharger">${ic('download')}</a>
+      <span class="activite-del" onclick="deleteDocument(${d.id})" title="Supprimer">${ic('trash')}</span>
     </div>
   `).join('');
 }
@@ -508,7 +584,7 @@ async function uploadDocument() {
   const data = await api(`/api/clients/${currentClientId}`);
   renderDocuments(data.documents || []);
   loadDashboard();
-  toast('Document envoyé ✔');
+  toast('Document envoyé');
 }
 
 async function deleteDocument(id) {
@@ -522,19 +598,19 @@ async function deleteDocument(id) {
 // ─── HISTORIQUE (dans le modal) ────────────────────────
 function renderHistorique(list) {
   const el = document.getElementById('historique-list');
-  if (!list.length) { el.innerHTML = '<div style="color:var(--text2);text-align:center;padding:24px">Aucun historique</div>'; return; }
+  if (!list.length) { el.innerHTML = emptyBlock('history', 'Aucun historique'); return; }
+  const histIcons = { 'Échange': 'message', 'Incident': 'alert', 'Renouvellement': 'refresh', 'Note': 'note' };
   el.innerHTML = list.map(h => `
     <div class="activite-item">
-      <div class="activite-icon">📝</div>
+      <div class="activite-icon">${ic(histIcons[h.type] || 'note')}</div>
       <div class="activite-body">
         <div class="activite-top">
-          <span class="activite-type">${h.type}</span>
-          <span class="activite-date">${formatDate(h.date)}</span>
-          ${h.auteur ? `<span class="activite-auteur">— ${h.auteur}</span>` : ''}
+          <span class="activite-type">${esc(h.type)}</span>
+          <span class="activite-date">${formatDate(h.date)}${h.auteur ? ` · ${esc(h.auteur)}` : ''}</span>
         </div>
-        <div class="activite-desc">${h.description || ''}</div>
+        <div class="activite-desc">${esc(h.description)}</div>
       </div>
-      <span class="activite-del" onclick="deleteHistorique(${h.id})">✕</span>
+      <span class="activite-del" onclick="deleteHistorique(${h.id})" title="Supprimer">${ic('trash')}</span>
     </div>
   `).join('');
 }
@@ -548,7 +624,7 @@ async function addHistorique() {
   document.getElementById('new-hist-desc').value = '';
   const data = await api(`/api/clients/${currentClientId}`);
   renderHistorique(data.historique || []);
-  toast('Historique ajouté ✔');
+  toast('Historique ajouté');
 }
 
 async function deleteHistorique(id) {
@@ -566,8 +642,8 @@ async function loadCarteClients() {
 
   if (!carteClientsMap) {
     carteClientsMap = L.map('carte-clients-map').setView([46.6, 2.5], 6);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap',
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap © CARTO',
       maxZoom: 18
     }).addTo(carteClientsMap);
   }
@@ -576,16 +652,16 @@ async function loadCarteClients() {
   carteClientsMarkers = [];
 
   clients.forEach(c => {
-    const color = c.type_client === 'Occasionnel' ? '#F57C00' : '#1565C0';
+    const color = c.type_client === 'Occasionnel' ? '#E0915E' : '#3A4C96';
     const marker = L.circleMarker([c.latitude, c.longitude], {
-      radius: 7, color, fillColor: color, fillOpacity: 0.85, weight: 2
+      radius: 8, color: '#fff', fillColor: color, fillOpacity: 0.95, weight: 2.5
     }).addTo(carteClientsMap);
     marker.bindPopup(`
       <strong>${c.societe}</strong><br>
       ${c.code_client ? `Code : ${c.code_client}<br>` : ''}
       ${[c.adresse, c.ville].filter(Boolean).join(', ') || ''}<br>
       ${c.categorie_client ? `<em>${c.categorie_client}</em><br>` : ''}
-      <em>${c.type_client === 'Occasionnel' ? '📋 Occasionnel' : '🔒 Régulier'}</em><br>
+      <em>${c.type_client === 'Occasionnel' ? 'Occasionnel' : 'Régulier'}</em><br>
       <a href="#" onclick="openClientModal(${c.id});return false;">Ouvrir la fiche →</a>
     `);
     carteClientsMarkers.push(marker);
@@ -595,6 +671,60 @@ async function loadCarteClients() {
 }
 
 // ─── UTILS ────────────────────────────────────────────
+function esc(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+}
+
+function ic(name, cls = 'i-sm') {
+  return `<svg class="i ${cls}"><use href="#i-${name}"/></svg>`;
+}
+
+function emptyBlock(icon, text) {
+  return `<div class="empty-state"><div class="empty-icon">${ic(icon, 'i-lg')}</div><p>${text}</p></div>`;
+}
+
+function initials(name) {
+  return esc((name || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase());
+}
+
+// Teintes douces, stables pour un même nom
+const AVATAR_TONES = [
+  ['#EEF1FA', '#3A4C96'], ['#FCF1E9', '#B96A3A'], ['#E7F1EF', '#4C7A73'],
+  ['#F3EEF8', '#6E5A96'], ['#EAF0F8', '#4A6FA5'], ['#F6F0E4', '#8C6D2E']
+];
+function clientAvatar(c, size = '') {
+  if (c.logo_mime_type) {
+    return `<span class="avatar ${size}"><img src="/api/clients/${c.id}/logo" alt="" loading="lazy"></span>`;
+  }
+  const name = c.societe || '?';
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  const [bg, fg] = AVATAR_TONES[h % AVATAR_TONES.length];
+  return `<span class="avatar ${size}" style="background:${bg};color:${fg}">${initials(name)}</span>`;
+}
+
+function statutPill(statut) {
+  const tone = { 'Actif': 'pill-success', 'Suspendu': 'pill-warning', 'Terminé': 'pill-neutral' }[statut] || 'pill-neutral';
+  return `<span class="pill pill-dot ${tone}">${esc(statut) || '—'}</span>`;
+}
+
+function typeClientPill(type) {
+  return type === 'Occasionnel'
+    ? `<span class="pill pill-accent">${ic('clipboard')}Occasionnel</span>`
+    : `<span class="pill pill-info">${ic('shield')}Régulier</span>`;
+}
+
+function timeAgo(d) {
+  if (!d) return '';
+  const diff = (Date.now() - new Date(d).getTime()) / 1000;
+  if (diff < 60) return "à l'instant";
+  if (diff < 3600) return `il y a ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
+  if (diff < 86400 * 30) return `il y a ${Math.floor(diff / 86400)} j`;
+  return formatDateShort(String(d).slice(0, 10));
+}
+
 function formatDate(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
