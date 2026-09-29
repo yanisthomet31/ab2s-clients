@@ -134,6 +134,18 @@ async function initDB() {
       date TIMESTAMP DEFAULT NOW(),
       created_at TIMESTAMP DEFAULT NOW()
     );
+    -- Grand livre : montants des prestations réalisées, par client et par mois
+    CREATE TABLE IF NOT EXISTS client_ca (
+      id SERIAL PRIMARY KEY,
+      client_id INTEGER REFERENCES clients(id) ON DELETE CASCADE,
+      mois DATE NOT NULL,
+      libelle TEXT,
+      montant NUMERIC NOT NULL DEFAULT 0,
+      auteur TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS client_ca_mois_idx ON client_ca (mois);
+    CREATE INDEX IF NOT EXISTS client_ca_client_idx ON client_ca (client_id);
     -- Migration ponctuelle : le compte avait été créé avec la faute de frappe "adber" au lieu de "abder"
     -- (doit s'exécuter AVANT l'INSERT ci-dessous pour éviter un conflit d'unicité sur 'abder')
     UPDATE users SET username='abder', nom='Abder', password_hash='$2b$10$YQ7ACExz9USL9asJRXM9VuYWb9JVue4UGv5IvCCxV1l2sA3LVlxLK' WHERE username='adber';
@@ -220,7 +232,7 @@ app.get('/api/clients', async (req, res) => {
   const params = [];
   if (search) {
     params.push(`%${search}%`);
-    text += ` AND (societe ILIKE $${params.length} OR contact_nom ILIKE $${params.length} OR ville ILIKE $${params.length})`;
+    text += ` AND (societe ILIKE $${params.length} OR code_client ILIKE $${params.length} OR contact_nom ILIKE $${params.length} OR ville ILIKE $${params.length})`;
   }
   if (type_client) { params.push(type_client); text += ` AND type_client = $${params.length}`; }
   text += ' ORDER BY updated_at DESC';
@@ -239,17 +251,19 @@ app.get('/api/clients/check-doublon', async (req, res) => {
 
 app.get('/api/clients/:id', async (req, res) => {
   const id = req.params.id;
-  const [clientR, sitesR, docsR, histR, contactsR, tarifsR] = await Promise.all([
+  const [clientR, sitesR, docsR, histR, contactsR, tarifsR, caR] = await Promise.all([
     query(`SELECT ${CLIENT_COLUMNS} FROM clients WHERE id=$1`, [id]),
     query('SELECT * FROM client_sites WHERE client_id=$1 ORDER BY created_at', [id]),
     query('SELECT id, client_id, type, nom_fichier, mime_type, taille_octets, uploaded_by, uploaded_at FROM client_documents WHERE client_id=$1 ORDER BY uploaded_at DESC', [id]),
     query('SELECT * FROM client_historique WHERE client_id=$1 ORDER BY date DESC', [id]),
     query('SELECT * FROM client_contacts WHERE client_id=$1 ORDER BY created_at', [id]),
-    query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee', [id])
+    query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee', [id]),
+    query(`SELECT id, client_id, to_char(mois, 'YYYY-MM') AS mois, libelle, montant, auteur, created_at
+           FROM client_ca WHERE client_id=$1 ORDER BY mois DESC, id DESC`, [id])
   ]);
   if (!clientR.rows[0]) return res.status(404).json({ error: 'Introuvable' });
 
-  res.json({ ...clientR.rows[0], sites: sitesR.rows, documents: docsR.rows, historique: histR.rows, contacts: contactsR.rows, tarifs: tarifsR.rows });
+  res.json({ ...clientR.rows[0], sites: sitesR.rows, documents: docsR.rows, historique: histR.rows, contacts: contactsR.rows, tarifs: tarifsR.rows, ca: caR.rows });
 });
 
 app.post('/api/clients', async (req, res) => {
@@ -445,6 +459,92 @@ app.post('/api/historique', async (req, res) => {
 app.delete('/api/historique/:id', async (req, res) => {
   await query('DELETE FROM client_historique WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
+});
+
+// ─── Chiffre d'affaires (grand livre) ───────────────────
+const MOIS_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+app.post('/api/clients/:clientId/ca', async (req, res) => {
+  const { mois, libelle, montant } = req.body;
+  const m = parseFloat(montant);
+  if (!MOIS_RE.test(mois || '')) return res.status(400).json({ error: 'Mois invalide' });
+  if (!Number.isFinite(m)) return res.status(400).json({ error: 'Montant invalide' });
+  const { rows } = await query(
+    'INSERT INTO client_ca (client_id, mois, libelle, montant, auteur) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+    [req.params.clientId, `${mois}-01`, libelle || null, m, req.session.nom]);
+  res.json({ id: rows[0].id });
+});
+
+app.delete('/api/ca/:id', async (req, res) => {
+  await query('DELETE FROM client_ca WHERE id=$1', [req.params.id]);
+  res.json({ ok: true });
+});
+
+app.get('/api/ca', async (req, res) => {
+  const annee = parseInt(req.query.annee) || new Date().getFullYear();
+  const { rows } = await query(
+    `SELECT ca.id, ca.client_id, c.societe, c.code_client, c.logo_mime_type,
+            to_char(ca.mois, 'YYYY-MM') AS mois, ca.libelle, ca.montant, ca.auteur, ca.created_at
+     FROM client_ca ca JOIN clients c ON c.id = ca.client_id
+     WHERE EXTRACT(YEAR FROM ca.mois) = $1
+     ORDER BY ca.mois DESC, ca.id DESC`, [annee]);
+  res.json(rows);
+});
+
+app.get('/api/ca/export', async (req, res) => {
+  const annee = parseInt(req.query.annee) || new Date().getFullYear();
+  const { rows } = await query(
+    `SELECT to_char(ca.mois, 'YYYY-MM') AS mois, c.code_client, c.societe, ca.libelle, ca.montant, ca.auteur
+     FROM client_ca ca JOIN clients c ON c.id = ca.client_id
+     WHERE EXTRACT(YEAR FROM ca.mois) = $1 ORDER BY ca.mois, c.societe`, [annee]);
+  const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const csv = [
+    ['Mois', 'Code client', 'Société', 'Libellé', 'Montant HT', 'Saisi par'].join(';'),
+    ...rows.map(r => [r.mois, cell(r.code_client), cell(r.societe), cell(r.libelle),
+      String(r.montant).replace('.', ','), cell(r.auteur)].join(';'))
+  ].join('\n');
+  res.setHeader('Content-Type', 'text/csv;charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment;filename="grand_livre_${annee}.csv"`);
+  res.send('\ufeff' + csv);
+});
+
+// ─── Recherche rapide (palette Ctrl+K) ──────────────────
+app.get('/api/search', async (req, res) => {
+  const q = (req.query.q || '').trim();
+  if (!q) return res.json({ clients: [], sites: [], contacts: [] });
+  const like = `%${q}%`;
+  const [clientsR, sitesR, contactsR] = await Promise.all([
+    query(`SELECT id, societe, code_client, ville, statut, logo_mime_type FROM clients
+           WHERE societe ILIKE $1 OR code_client ILIKE $1
+           ORDER BY (code_client ILIKE $2 OR societe ILIKE $2) DESC, societe LIMIT 8`, [like, `${q}%`]),
+    query(`SELECT s.id, s.nom_site, s.code_site, s.adresse_site, s.client_id, c.societe FROM client_sites s
+           JOIN clients c ON c.id = s.client_id
+           WHERE s.nom_site ILIKE $1 OR s.code_site ILIKE $1 ORDER BY s.nom_site LIMIT 5`, [like]),
+    query(`SELECT k.id, k.nom, k.poste, k.client_id, c.societe FROM client_contacts k
+           JOIN clients c ON c.id = k.client_id
+           WHERE k.nom ILIKE $1 ORDER BY k.nom LIMIT 5`, [like])
+  ]);
+  res.json({ clients: clientsR.rows, sites: sitesR.rows, contacts: contactsR.rows });
+});
+
+// ─── Statistiques du tableau de bord ────────────────────
+app.get('/api/stats', async (req, res) => {
+  const [catR, echR, caR] = await Promise.all([
+    query(`SELECT COALESCE(NULLIF(categorie_client, ''), 'Autres') AS categorie, COUNT(*)::int AS n
+           FROM clients WHERE statut <> 'Terminé' GROUP BY 1`),
+    query(`SELECT to_char(date_trunc('month', date_fin_contrat), 'YYYY-MM') AS mois, COUNT(*)::int AS n
+           FROM clients
+           WHERE NOT COALESCE(tacite_reconduction, FALSE) AND statut <> 'Terminé'
+             AND date_fin_contrat >= date_trunc('month', CURRENT_DATE)
+             AND date_fin_contrat <  date_trunc('month', CURRENT_DATE) + INTERVAL '12 months'
+           GROUP BY 1`),
+    query(`SELECT to_char(mois, 'YYYY-MM') AS mois, SUM(montant)::float AS total
+           FROM client_ca
+           WHERE mois >= date_trunc('month', CURRENT_DATE) - INTERVAL '11 months'
+             AND mois <  date_trunc('month', CURRENT_DATE) + INTERVAL '1 month'
+           GROUP BY 1`)
+  ]);
+  res.json({ categories: catR.rows, echeances: echR.rows, ca: caR.rows });
 });
 
 // ─── KPI ────────────────────────────────────────────────

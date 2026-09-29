@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>AB2S Sécurité — Base de données Clients</title>
+<script>
+  // Applique le thème avant le premier rendu (évite le flash clair → sombre)
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('ab2s-theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
 <link rel="icon" type="image/png" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -46,6 +55,17 @@
   <symbol id="i-note" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
   <symbol id="i-alert" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4M12 17h.01"/></symbol>
   <symbol id="i-message" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+  <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></symbol>
+  <symbol id="i-trend" viewBox="0 0 24 24"><path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m17 8-5-5-5 5M12 3v12"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.38 2.63a2.12 2.12 0 1 1 3 3L12 15l-4 1 1-4Z"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20"/><path d="M8 7h8M8 11h6"/></symbol>
+  <symbol id="i-hash" viewBox="0 0 24 24"><path d="M4 9h16M4 15h16M10 3 8 21M16 3l-2 18"/></symbol>
+  <symbol id="i-enter" viewBox="0 0 24 24"><path d="M9 10l-5 5 5 5"/><path d="M20 4v7a4 4 0 0 1-4 4H4"/></symbol>
+
 </svg>
 
 <!-- SIDEBAR -->
@@ -61,23 +81,33 @@
     </div>
   </div>
 
+  <button class="search-trigger" onclick="openPalette()" title="Recherche rapide">
+    <svg class="i"><use href="#i-search"/></svg><span>Rechercher…</span><kbd id="kbd-hint">Ctrl K</kbd>
+  </button>
+
   <div class="sidebar-section">Navigation</div>
   <nav class="sidebar-nav">
-    <a class="nav-item active" data-tab="dashboard" onclick="showTab('dashboard')">
+    <a class="nav-item active" data-tab="dashboard" href="#/dashboard">
       <span class="nav-icon"><svg class="i"><use href="#i-dashboard"/></svg></span><span>Tableau de bord</span>
     </a>
-    <a class="nav-item" data-tab="clients" onclick="showTab('clients')">
+    <a class="nav-item" data-tab="clients" href="#/clients">
       <span class="nav-icon"><svg class="i"><use href="#i-building"/></svg></span><span>Clients</span>
     </a>
-    <a class="nav-item" data-tab="sites" onclick="showTab('sites')">
+    <a class="nav-item" data-tab="ca" href="#/ca">
+      <span class="nav-icon"><svg class="i"><use href="#i-book"/></svg></span><span>Chiffre d'affaires</span>
+    </a>
+    <a class="nav-item" data-tab="sites" href="#/sites">
       <span class="nav-icon"><svg class="i"><use href="#i-pin"/></svg></span><span>Sites</span>
     </a>
-    <a class="nav-item" data-tab="carte" onclick="showTab('carte')">
+    <a class="nav-item" data-tab="carte" href="#/carte">
       <span class="nav-icon"><svg class="i"><use href="#i-map"/></svg></span><span>Carte des clients</span>
     </a>
   </nav>
 
   <div class="sidebar-footer">
+    <button class="btn-export" onclick="toggleTheme()" id="theme-toggle">
+      <svg class="i"><use href="#i-moon" id="theme-icon"/></svg><span id="theme-label">Mode sombre</span>
+    </button>
     <button class="btn-export" onclick="exportCSV()"><svg class="i"><use href="#i-download"/></svg><span>Exporter en CSV</span></button>
     <button class="btn-export" onclick="changePassword()"><svg class="i"><use href="#i-key"/></svg><span>Mot de passe</span></button>
     <button class="btn-export danger" onclick="logout()"><svg class="i"><use href="#i-logout"/></svg><span>Déconnexion</span></button>
@@ -110,15 +140,16 @@
         <div class="kpi-label">Clients actifs</div>
         <div class="kpi-value" id="k-clients">—</div>
       </div>
+      <div class="kpi-card teal">
+        <div class="kpi-icon"><svg class="i"><use href="#i-trend"/></svg></div>
+        <div class="kpi-label">CA du mois en cours</div>
+        <div class="kpi-value" id="k-ca">—</div>
+        <div class="kpi-delta" id="k-ca-delta"></div>
+      </div>
       <div class="kpi-card orange">
         <div class="kpi-icon"><svg class="i"><use href="#i-pin"/></svg></div>
         <div class="kpi-label">Sites surveillés</div>
         <div class="kpi-value" id="k-sites">—</div>
-      </div>
-      <div class="kpi-card teal">
-        <div class="kpi-icon"><svg class="i"><use href="#i-file"/></svg></div>
-        <div class="kpi-label">Documents</div>
-        <div class="kpi-value" id="k-documents">—</div>
       </div>
       <div class="kpi-card red">
         <div class="kpi-icon"><svg class="i"><use href="#i-clock"/></svg></div>
@@ -127,12 +158,43 @@
       </div>
     </div>
 
-    <div class="dash-grid">
+    <div class="dash-grid dash-grid-charts">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3>Chiffre d'affaires</h3>
+            <div class="card-sub">12 derniers mois, d'après le grand livre</div>
+          </div>
+          <a class="link" href="#/ca">Grand livre <svg class="i i-sm"><use href="#i-arrow"/></svg></a>
+        </div>
+        <div id="chart-ca" class="chart"></div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3>Répartition par catégorie</h3>
+            <div class="card-sub">Clients actifs et suspendus</div>
+          </div>
+        </div>
+        <div id="chart-categories" class="chart"></div>
+      </div>
+    </div>
+
+    <div class="dash-grid dash-grid-3">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h3>Fins de contrat</h3>
+            <div class="card-sub">Sur les 12 prochains mois</div>
+          </div>
+        </div>
+        <div id="chart-echeances" class="chart"></div>
+      </div>
       <div class="card">
         <div class="card-header">
           <div>
             <h3>Contrats à échéance</h3>
-            <div class="card-sub">Fins de contrat dans les 90 prochains jours</div>
+            <div class="card-sub">Dans les 90 prochains jours</div>
           </div>
         </div>
         <div id="dash-echeances" class="list"></div>
@@ -141,9 +203,9 @@
         <div class="card-header">
           <div>
             <h3>Activité récente</h3>
-            <div class="card-sub">Dernières fiches créées ou modifiées</div>
+            <div class="card-sub">Dernières fiches modifiées</div>
           </div>
-          <a class="link" onclick="showTab('clients')">Tout voir <svg class="i i-sm"><use href="#i-arrow"/></svg></a>
+          <a class="link" href="#/clients">Tout voir <svg class="i i-sm"><use href="#i-arrow"/></svg></a>
         </div>
         <div id="dash-recents" class="list"></div>
       </div>
@@ -167,7 +229,7 @@
       </div>
       <div class="search-box">
         <svg class="i"><use href="#i-search"/></svg>
-        <input type="search" id="search-input" placeholder="Rechercher une société, un contact, une ville…" oninput="loadClients()" class="search-input">
+        <input type="search" id="search-input" placeholder="Rechercher par nom, code client, contact, ville…" oninput="loadClientsDebounced()" class="search-input">
       </div>
     </div>
     <div class="card" style="padding:0">
@@ -185,6 +247,49 @@
         <p>Aucun client trouvé</p>
         <button class="btn-primary mt12" onclick="openClientModal()"><svg class="i"><use href="#i-plus"/></svg>Ajouter un client</button>
       </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════ FICHE CLIENT (page) ═══════════════════ -->
+  <section id="tab-client" class="tab-section">
+    <div id="client-page"></div>
+  </section>
+
+  <!-- ═══════════════════ CHIFFRE D'AFFAIRES (grand livre) ═══════════════════ -->
+  <section id="tab-ca" class="tab-section">
+    <div class="page-header">
+      <div>
+        <h1>Chiffre d'affaires</h1>
+        <p class="page-sub">Grand livre des prestations réalisées, client par client et mois par mois.</p>
+      </div>
+      <div class="header-actions">
+        <div class="year-switch">
+          <button class="btn-ghost btn-icon" onclick="changeCaYear(-1)" title="Année précédente"><svg class="i i-sm"><use href="#i-back"/></svg></button>
+          <span id="ca-year">—</span>
+          <button class="btn-ghost btn-icon" onclick="changeCaYear(1)" title="Année suivante"><svg class="i i-sm"><use href="#i-chevron"/></svg></button>
+        </div>
+        <button class="btn-ghost" onclick="exportCaCSV()"><svg class="i i-sm"><use href="#i-download"/></svg>Exporter</button>
+        <button class="btn-primary" onclick="openCaEntryDialog()"><svg class="i"><use href="#i-plus"/></svg>Nouvelle écriture</button>
+      </div>
+    </div>
+    <div class="kpi-grid" id="ca-kpis"></div>
+    <div class="card" style="padding:0">
+      <div class="card-header card-header-pad">
+        <div>
+          <h3>Tableau annuel</h3>
+          <div class="card-sub">Montants HT par client et par mois — cliquez sur une ligne pour ouvrir la fiche</div>
+        </div>
+      </div>
+      <div class="table-wrap" id="ca-matrix"></div>
+    </div>
+    <div class="card mt16">
+      <div class="card-header">
+        <div>
+          <h3>Écritures</h3>
+          <div class="card-sub">Détail des montants saisis sur l'année</div>
+        </div>
+      </div>
+      <div id="ca-entries"></div>
     </div>
   </section>
 
@@ -211,8 +316,8 @@
         <p class="page-sub">Répartition géographique de votre portefeuille.</p>
       </div>
       <div class="map-legend">
-        <span><i style="background:#3A4C96"></i>Réguliers</span>
-        <span><i style="background:#E0915E"></i>Occasionnels</span>
+        <span><i style="background:var(--series-1)"></i>Réguliers</span>
+        <span><i style="background:var(--series-2)"></i>Occasionnels</span>
       </div>
     </div>
     <div class="card map-card">
@@ -222,9 +327,7 @@
 
 </main>
 
-<!-- ═══════════════════════════════════════════════════════
-     MODAL FICHE CLIENT
-═══════════════════════════════════════════════════════ -->
+<!-- ═══════════════════ MODAL : CRÉATION / MODIFICATION CLIENT ═══════════════════ -->
 <div id="modal-overlay" class="modal-overlay" onclick="closeModal(event)">
   <div class="modal" id="modal-client">
     <div class="modal-header">
@@ -233,17 +336,7 @@
       <button class="modal-close" onclick="closeClientModal()" aria-label="Fermer"><svg class="i i-sm"><use href="#i-x"/></svg></button>
     </div>
 
-    <div class="modal-tabs">
-      <button class="modal-tab active" onclick="switchModalTab('infos',this)"><svg class="i"><use href="#i-info"/></svg>Informations</button>
-      <button class="modal-tab" onclick="switchModalTab('contacts',this)"><svg class="i"><use href="#i-users"/></svg>Contacts</button>
-      <button class="modal-tab" onclick="switchModalTab('sites',this)"><svg class="i"><use href="#i-pin"/></svg>Sites</button>
-      <button class="modal-tab" onclick="switchModalTab('tarifs',this)"><svg class="i"><use href="#i-euro"/></svg>Tarifs</button>
-      <button class="modal-tab" onclick="switchModalTab('documents',this)"><svg class="i"><use href="#i-file"/></svg>Documents</button>
-      <button class="modal-tab" onclick="switchModalTab('historique',this)"><svg class="i"><use href="#i-history"/></svg>Historique</button>
-    </div>
-
-    <!-- Tab Infos -->
-    <div id="mtab-infos" class="modal-tab-content active">
+    <div class="modal-body">
       <form id="client-form">
         <input type="hidden" id="f-id">
 
@@ -381,76 +474,54 @@
       </form>
     </div>
 
-    <!-- Tab Contacts -->
-    <div id="mtab-contacts" class="modal-tab-content">
-      <div class="activite-add">
-        <input type="text" id="new-contact-nom" placeholder="Nom Prénom" class="search-input">
-        <input type="text" id="new-contact-poste" placeholder="Poste" class="filter-select" style="max-width:140px">
-        <input type="tel" id="new-contact-telephone" placeholder="Téléphone" class="filter-select" style="max-width:150px">
-        <input type="email" id="new-contact-email" placeholder="Email" class="search-input">
-        <button class="btn-primary" onclick="addContact()"><svg class="i"><use href="#i-plus"/></svg>Ajouter</button>
-      </div>
-      <div id="contacts-list"></div>
-    </div>
-
-    <!-- Tab Sites -->
-    <div id="mtab-sites" class="modal-tab-content">
-      <div class="activite-add">
-        <input type="text" id="new-site-nom" placeholder="Nom du site" class="search-input">
-        <input type="text" id="new-site-code" placeholder="Code site" class="filter-select" style="max-width:140px">
-        <input type="text" id="new-site-adresse" placeholder="Adresse du site" class="search-input">
-        <button class="btn-primary" onclick="addSite()"><svg class="i"><use href="#i-plus"/></svg>Ajouter</button>
-      </div>
-      <div id="sites-list"></div>
-    </div>
-
-    <!-- Tab Tarifs -->
-    <div id="mtab-tarifs" class="modal-tab-content">
-      <div class="activite-add">
-        <input type="number" id="new-tarif-annee" placeholder="Année" class="filter-select" style="max-width:110px">
-        <input type="number" id="new-tarif-taux" placeholder="Taux horaire (€)" step="0.01" min="0" class="search-input">
-        <button class="btn-primary" onclick="addTarif()"><svg class="i"><use href="#i-plus"/></svg>Ajouter</button>
-      </div>
-      <div id="tarifs-list"></div>
-    </div>
-
-    <!-- Tab Documents -->
-    <div id="mtab-documents" class="modal-tab-content">
-      <div class="activite-add">
-        <select id="new-doc-type" class="filter-select">
-          <option value="devis">Devis</option><option value="contrat">Contrat</option>
-          <option value="facture">Facture</option><option value="autre">Autre</option>
-        </select>
-        <input type="file" id="new-doc-file" class="search-input">
-        <button class="btn-primary" onclick="uploadDocument()"><svg class="i"><use href="#i-download" style="transform:rotate(180deg);transform-origin:center"/></svg>Envoyer</button>
-      </div>
-      <div id="documents-list"></div>
-    </div>
-
-    <!-- Tab Historique -->
-    <div id="mtab-historique" class="modal-tab-content">
-      <div class="activite-add">
-        <select id="new-hist-type" class="filter-select">
-          <option>Échange</option><option>Incident</option><option>Renouvellement</option><option>Note</option>
-        </select>
-        <input type="text" id="new-hist-desc" placeholder="Description" class="search-input">
-        <button class="btn-primary" onclick="addHistorique()"><svg class="i"><use href="#i-plus"/></svg>Ajouter</button>
-      </div>
-      <div id="historique-list"></div>
-    </div>
-
     <div class="modal-footer">
-      <button class="btn-danger" id="btn-delete" onclick="deleteClient()" style="display:none"><svg class="i i-sm"><use href="#i-trash"/></svg>Supprimer</button>
       <span class="spacer"></span>
-      <button class="btn-ghost" id="btn-fiche-pdf" onclick="ouvrirFichePDF()" style="display:none"><svg class="i i-sm"><use href="#i-printer"/></svg>Fiche PDF</button>
       <button class="btn-ghost" onclick="closeClientModal()">Annuler</button>
-      <button class="btn-primary" onclick="saveClient()"><svg class="i i-sm"><use href="#i-check"/></svg>Enregistrer</button>
+      <button class="btn-primary" id="btn-save-client" onclick="saveClient()"><svg class="i i-sm"><use href="#i-check"/></svg>Enregistrer</button>
     </div>
   </div>
 </div>
 
+<!-- Boîte de dialogue générique (confirmations, saisies) -->
+<div id="dialog-overlay" class="modal-overlay dialog-overlay">
+  <div class="modal dialog" role="dialog" aria-modal="true" aria-labelledby="dialog-title">
+    <div class="dialog-body">
+      <div class="dialog-icon" id="dialog-icon"></div>
+      <div class="dialog-text">
+        <h2 id="dialog-title"></h2>
+        <p id="dialog-message"></p>
+      </div>
+    </div>
+    <form id="dialog-form" class="dialog-fields"></form>
+    <p id="dialog-error" class="dialog-error"></p>
+    <div class="modal-footer">
+      <span class="spacer"></span>
+      <button class="btn-ghost" id="dialog-cancel" type="button">Annuler</button>
+      <button class="btn-primary" id="dialog-ok" type="button">Valider</button>
+    </div>
+  </div>
+</div>
+
+<!-- Palette de recherche (Ctrl+K) -->
+<div id="palette-overlay" class="palette-overlay" onclick="if (event.target === this) closePalette()">
+  <div class="palette" role="dialog" aria-modal="true" aria-label="Recherche rapide">
+    <div class="palette-input">
+      <svg class="i"><use href="#i-search"/></svg>
+      <input type="text" id="palette-input" placeholder="Nom ou code client, site, contact…" autocomplete="off" spellcheck="false">
+      <kbd>Échap</kbd>
+    </div>
+    <div class="palette-results" id="palette-results"></div>
+    <div class="palette-foot">
+      <span><kbd>↑</kbd><kbd>↓</kbd> naviguer</span>
+      <span><kbd>Entrée</kbd> ouvrir</span>
+    </div>
+  </div>
+</div>
+
+<div id="chart-tip" class="chart-tip" role="tooltip"></div>
+
 <!-- TOAST -->
-<div id="toast" class="toast"></div>
+<div id="toast" class="toast"><span id="toast-msg"></span><button id="toast-action" class="toast-action" type="button"></button></div>
 
 <script src="app.js"></script>
 </body>
