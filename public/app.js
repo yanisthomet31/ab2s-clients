@@ -43,6 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   window.addEventListener('hashchange', route);
   window.addEventListener('resize', debounce(renderVisibleCharts, 150));
   window.addEventListener('pagehide', flushPendingDeleteOnExit);
+  setupIdleLogout();
   route();
 });
 
@@ -113,12 +114,39 @@ async function api(path, opts = {}) {
       ...opts,
       body: opts.body && !(opts.body instanceof FormData) ? JSON.stringify(opts.body) : opts.body
     });
-    if (r.status === 401) { window.location.href = '/login.html'; return null; }
+    if (r.status === 401) {
+      const j = await r.json().catch(() => ({}));
+      window.location.href = j.expired ? '/login.html?expired=1' : '/login.html';
+      return null;
+    }
     return r.json().catch(() => null);
   } catch (e) {
     toast('Erreur de connexion au serveur', true);
     return null;
   }
+}
+
+// ─── DÉCONNEXION APRÈS INACTIVITÉ ─────────────────────
+// Le serveur coupe la session après 30 min sans requête. Tant que l'utilisateur
+// bouge la souris ou tape au clavier, on envoie un signe de vie toutes les 4 min ;
+// après 30 min sans aucune activité, on se déconnecte proprement.
+const INACTIVITE_MAX_MS = 30 * 60 * 1000;
+function setupIdleLogout() {
+  let lastActivity = Date.now(), lastPing = Date.now();
+  const bump = () => { lastActivity = Date.now(); };
+  ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart', 'wheel'].forEach(ev =>
+    window.addEventListener(ev, bump, { passive: true }));
+  setInterval(async () => {
+    const now = Date.now();
+    if (now - lastActivity > INACTIVITE_MAX_MS) {
+      flushPendingDeleteOnExit();
+      await fetch(API + '/api/logout', { method: 'POST' }).catch(() => {});
+      window.location.href = '/login.html?expired=1';
+    } else if (lastActivity > lastPing && now - lastPing > 4 * 60 * 1000) {
+      lastPing = now;
+      api('/api/me');
+    }
+  }, 30 * 1000);
 }
 
 // ─── THÈME CLAIR / SOMBRE ─────────────────────────────
