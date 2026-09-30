@@ -950,71 +950,90 @@ input[type="file"]::file-selector-button:hover { background: var(--bg-2); }
 .map-legend i.legend-region { width: 16px; height: 10px; border-radius: 3px; border: 2px solid var(--accent); background: var(--accent-50); }
 .header-actions .map-legend { margin-right: 8px; }
 
-/* ─── LOGIN ──────────────────────────────────────────── */
-.login-body {
-  align-items: center;
-  justify-content: center;
-  background: var(--ink-950);
+/* ─── LOGIN : photo à gauche, formulaire à droite ───── */
+.auth-body { display: flex; min-height: 100vh; background: var(--bg); }
+.auth-photo {
+  position: relative;
+  flex: 1.25;
   overflow: hidden;
-  position: relative;
-  padding: 20px;
+  background: var(--ink-950);
+  color: #fff;
+  display: flex; flex-direction: column; justify-content: space-between;
+  padding: 40px 44px;
 }
-.login-bg { position: fixed; inset: 0; overflow: hidden; pointer-events: none; }
-.login-bg::after {
-  content: '';
-  position: absolute; inset: 0;
-  background-image: radial-gradient(rgba(255,255,255,.06) 1px, transparent 1px);
-  background-size: 22px 22px;
-  mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
-  -webkit-mask-image: radial-gradient(ellipse at center, #000 30%, transparent 75%);
+.auth-photo-img {
+  position: absolute; inset: -2%;
+  background: url('assets/login-bg.jpg') center 30% / cover no-repeat;
+  opacity: .78;
+  filter: saturate(.85) contrast(1.02);
+  animation: kenburns 28s ease-in-out infinite alternate;
 }
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  opacity: .55;
-  animation: drift 18s ease-in-out infinite alternate;
+.auth-photo::after {
+  /* Voile teinté aux couleurs du logiciel : la photo passe en transparence */
+  content: ''; position: absolute; inset: 0;
+  background:
+    linear-gradient(180deg, rgba(15,21,40,.55) 0%, rgba(15,21,40,.10) 32%, rgba(15,21,40,.25) 58%, rgba(15,21,40,.92) 100%),
+    linear-gradient(120deg, rgba(58,76,150,.45) 0%, rgba(58,76,150,.10) 50%, rgba(224,145,94,.18) 100%);
 }
-.blob.b1 { width: 520px; height: 520px; background: #3A4C96; left: -120px; top: -140px; }
-.blob.b2 { width: 420px; height: 420px; background: #C9744A; right: -100px; bottom: -120px; opacity: .35; animation-delay: -6s; }
-.blob.b3 { width: 360px; height: 360px; background: #5A6FB8; right: 20%; top: 30%; opacity: .25; animation-delay: -12s; }
+.auth-photo > *:not(.auth-photo-img) { position: relative; z-index: 1; }
+.auth-brand { display: flex; align-items: center; gap: 12px; animation: fadeIn .8s var(--ease) .1s both; }
+.auth-brand .logo-tile { width: 48px; height: 48px; border-radius: 14px; }
+.auth-brand .logo-tile img { width: 36px; height: 36px; }
+.auth-brand-name { font-weight: 700; font-size: 16px; letter-spacing: .2px; }
+.auth-brand-sub { font-size: 12px; color: rgba(255,255,255,.65); }
+.auth-pitch { max-width: 520px; animation: riseIn .9s var(--ease) .25s both; }
+.auth-pitch h2 { font-size: 30px; line-height: 1.2; font-weight: 700; letter-spacing: -.6px; text-wrap: balance; }
+.auth-pitch p { margin-top: 12px; font-size: 14.5px; color: rgba(255,255,255,.75); line-height: 1.6; }
+.auth-tags { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 20px; }
+.auth-tags span {
+  font-size: 12px; font-weight: 550; padding: 5px 12px; border-radius: 999px;
+  background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.18);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
 
-.login-card {
-  position: relative;
-  width: 380px;
-  max-width: 100%;
-  padding: 36px 32px 30px;
-  background: rgba(255,255,255,.97);
-  border-radius: 20px;
-  box-shadow: 0 30px 80px -20px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.1);
-  animation: modalIn .7s var(--spring) both;
+.auth-panel {
+  flex: 1; max-width: 560px; min-width: 380px;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 48px 56px;
+  background: var(--card);
+  box-shadow: -20px 0 60px -30px rgba(15,21,40,.35);
+  position: relative; z-index: 1;
 }
-.login-logo {
-  width: 72px; height: 72px;
-  margin: 0 auto 18px;
-  border-radius: 20px;
-  background: #fff;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: var(--shadow-md), 0 0 0 1px var(--border);
+.auth-form-wrap { width: 100%; max-width: 380px; margin: 0 auto; animation: riseIn .7s var(--ease) .15s both; }
+.auth-form-wrap h1 { font-size: 26px; font-weight: 700; letter-spacing: -.6px; }
+.auth-form-wrap .page-sub { margin: 6px 0 28px; }
+.login-form { display: flex; flex-direction: column; gap: 16px; }
+.login-form .form-group input { padding: 12px 14px; font-size: 14px; }
+.login-form .btn-primary { margin-top: 4px; padding: 13px 18px; font-size: 14.5px; }
+.remember { display: flex; align-items: center; gap: 9px; font-size: 13px; color: var(--text2); cursor: pointer; user-select: none; }
+.remember input { width: 16px; height: 16px; accent-color: var(--primary); cursor: pointer; }
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 44px !important; }
+.pw-toggle {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  width: 34px; height: 34px; border: none; background: none; border-radius: 8px;
+  color: var(--text3); cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
-.login-logo img { width: 54px; height: 54px; object-fit: contain; }
-.login-card h1 { font-size: 21px; font-weight: 700; letter-spacing: -.4px; text-align: center; }
-.login-card .page-sub { text-align: center; margin-bottom: 26px; font-size: 13.5px; }
-.login-form { display: flex; flex-direction: column; gap: 14px; }
-.login-form .btn-primary { margin-top: 6px; padding: 12px 18px; font-size: 14px; }
-.login-error {
-  display: none;
-  align-items: center; gap: 8px;
-  margin-top: 14px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: var(--danger-bg);
-  color: var(--danger);
-  font-size: 13px;
-  font-weight: 500;
-  animation: shake .4s var(--ease);
+.pw-toggle:hover { color: var(--text); background: var(--bg); }
+.login-error, .login-info {
+  display: none; align-items: center; gap: 10px;
+  margin-top: 16px; padding: 11px 14px; border-radius: 10px;
+  font-size: 13px; font-weight: 500;
 }
-.login-foot { text-align: center; color: rgba(255,255,255,.35); font-size: 12px; margin-top: 22px; }
+.login-error { background: var(--danger-bg); color: var(--danger); animation: shake .4s var(--ease); }
+.login-info { background: var(--info-bg); color: var(--info); margin: 0 0 20px; }
+.login-info.show { display: flex; }
+.auth-foot { margin-top: 32px; font-size: 12px; color: var(--text3); display: flex; align-items: center; gap: 8px; }
+
+@keyframes kenburns { from { transform: scale(1) translate(0, 0); } to { transform: scale(1.07) translate(-1%, -1%); } }
+
+@media (max-width: 900px) {
+  /* Sur mobile : la photo passe en fond plein écran, le formulaire flotte dessus */
+  .auth-body { position: relative; align-items: center; justify-content: center; padding: 20px; }
+  .auth-photo { position: fixed; inset: 0; padding: 0; }
+  .auth-photo > *:not(.auth-photo-img) { display: none; }
+  .auth-panel { min-width: 0; width: 100%; max-width: 420px; padding: 32px 26px; border-radius: 20px; box-shadow: 0 30px 80px -20px rgba(0,0,0,.6); }
+}
 
 /* ═══════════════════════════════════════════════════════
    COMPOSANTS AJOUTÉS : recherche, graphiques, fiche client,
@@ -1460,7 +1479,6 @@ button.activite-del { background: none; border: none; }
 @keyframes modalIn   { from { opacity: 0; transform: translateY(18px) scale(.97); } to { opacity: 1; transform: none; } }
 @keyframes modalOut  { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(10px) scale(.98); } }
 @keyframes toastIn   { from { opacity: 0; transform: translateY(16px) scale(.96); } to { opacity: 1; transform: none; } }
-@keyframes drift     { from { transform: translate(0,0) scale(1); } to { transform: translate(60px,40px) scale(1.12); } }
 @keyframes shake     { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 
 @media (prefers-reduced-motion: reduce) {
