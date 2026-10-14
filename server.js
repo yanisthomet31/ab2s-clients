@@ -156,6 +156,18 @@ async function initDB() {
       ('Samar', 'samar', '$2b$10$PnYV/obNFYaptJVhd95g7Og4acwvWMq1irLHDjnncKgdD28x21WdK')
     ON CONFLICT (username) DO NOTHING;
   `);
+
+  // Migrations ponctuelles : chacune ne s'exécute qu'une seule fois (mémorisée dans la table migrations)
+  await query(`CREATE TABLE IF NOT EXISTS migrations (nom TEXT PRIMARY KEY, appliquee_le TIMESTAMP DEFAULT NOW())`);
+  const once = async (nom, fn) => {
+    const { rowCount } = await query('INSERT INTO migrations (nom) VALUES ($1) ON CONFLICT DO NOTHING', [nom]);
+    if (rowCount) { await fn(); console.log(`🔧 Migration appliquée : ${nom}`); }
+  };
+  // Réinitialisation du mot de passe d'Abder (connexion impossible signalée le 14/10/2026).
+  // Le nouveau mot de passe a été transmis à Yanis ; Abder pourra le changer depuis le menu.
+  await once('reset-mdp-abder-2026-10', () =>
+    query("UPDATE users SET password_hash=$1 WHERE username='abder'", ['$2b$10$rK3upSMaO9z/WL6aQG5.xeb7OY02.nKbBoQbLfpQ0IAlkwlh6jDSC']));
+
   console.log('✅ Base de données initialisée');
 }
 
