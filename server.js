@@ -167,6 +167,9 @@ async function initDB() {
   // Le nouveau mot de passe a été transmis à Yanis ; Abder pourra le changer depuis le menu.
   await once('reset-mdp-abder-2026-10', () =>
     query("UPDATE users SET password_hash=$1 WHERE username='abder'", ['$2b$10$rK3upSMaO9z/WL6aQG5.xeb7OY02.nKbBoQbLfpQ0IAlkwlh6jDSC']));
+  // Remplacé à la demande par un mot de passe plus simple à retenir (à changer par Abder à la première connexion)
+  await once('reset-mdp-abder-2026-10-simple', () =>
+    query("UPDATE users SET password_hash=$1 WHERE username='abder'", ['$2b$10$HgMmuw1bbSyf5DklrbJPH.dem9BTJnO7jENS5uJNXvnJg0WrlUUY6']));
 
   console.log('✅ Base de données initialisée');
 }
