@@ -16,20 +16,20 @@
 <link rel="icon" type="image/png" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <style>
   :root {
     /* Palette du logiciel (encre marine + abricot, adoucis) */
-    --primary: #3A4C96;
-    --primary-50: #EEF1FA;
-    --accent: #E0915E;
-    --accent-50: #FCF1E9;
-    --accent-ink: #B96A3A;
-    --ink: #1B2233;
-    --ink2: #5B6478;
-    --ink3: #8C93A5;
-    --line: #E5E8EF;
-    --line-strong: #D8DCE6;
+    --primary: #26327E;
+    --primary-50: #ECEEF7;
+    --accent: #D2733C;
+    --accent-50: #FBEEE4;
+    --accent-ink: #B35E2C;
+    --ink: #191D2B;
+    --ink2: #4C5163;
+    --ink3: #878A96;
+    --line: #E4E0D6;
+    --line-strong: #D2CCBE;
     --tint: #F6F7FA;
     --paper: #FFFFFF;
     --success: #3F8A68; --success-bg: #E8F3ED;
@@ -37,16 +37,16 @@
     --neutral: #6F7689; --neutral-bg: #EFF1F5;
     --info: #4A6FA5;    --info-bg: #EAF0F8;
 
-    --chrome: #F4F5F8;
-    --chrome-ink: #5B6478;
+    --chrome: #F4F2EC;
+    --chrome-ink: #4C5163;
     --chrome-card: #FFFFFF;
-    --chrome-border: #D8DCE6;
+    --chrome-border: #D2CCBE;
   }
   :root[data-theme="dark"] {
-    --chrome: #0E1322;
+    --chrome: #11131B;
     --chrome-ink: #A7AEC2;
-    --chrome-card: #1A2035;
-    --chrome-border: #323B5C;
+    --chrome-card: #191C26;
+    --chrome-border: #3A3F4F;
   }
 
   * { box-sizing: border-box; }
@@ -55,8 +55,7 @@
     margin: 0;
     background: var(--chrome);
     color: var(--chrome-ink);
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    font-feature-settings: "cv11", "ss01";
+    font-family: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     padding: 36px 20px 80px;
     display: flex; flex-direction: column; align-items: center; gap: 24px;
   }
@@ -66,19 +65,20 @@
   .toolbar-left { display: flex; align-items: center; gap: 14px; }
   .toolbar-label { font-weight: 650; font-size: 15px; color: var(--chrome-ink); }
   .toolbar-sub { font-size: 13px; opacity: .75; margin-top: 2px; }
-  .btn { display: inline-flex; align-items: center; gap: 8px; font-family: inherit; font-size: 13.5px; font-weight: 600; border-radius: 10px; padding: 10px 16px; cursor: pointer; text-decoration: none; transition: transform .2s, box-shadow .2s, background .2s; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; font-family: inherit; font-size: 13.5px; font-weight: 500; border-radius: 6px; padding: 10px 16px; cursor: pointer; text-decoration: none; transition: transform .2s, box-shadow .2s, background .2s; }
   .btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
   .btn-back { background: var(--chrome-card); color: var(--chrome-ink); border: 1px solid var(--chrome-border); }
   .btn-back:hover { transform: translateY(-1px); }
-  .btn-print { background: linear-gradient(180deg, #4457A6 0%, #3A4C96 100%); color: #fff; border: 1px solid #32427F; box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 6px 16px -6px rgba(58,76,150,.55); }
-  .btn-print:hover { transform: translateY(-1px); box-shadow: 0 1px 0 rgba(255,255,255,.18) inset, 0 12px 24px -8px rgba(58,76,150,.6); }
+  .btn-print { background: #26327E; color: #fff; border: 1px solid #26327E; }
+  .btn-print:hover { background: #1F2A6B; }
 
   /* ─── Feuille A4 ─── */
   .sheet {
     width: 210mm; min-height: 297mm; max-width: 100%;
     background: var(--paper); color: var(--ink);
-    border-radius: 6px;
-    box-shadow: 0 2px 6px rgba(20,28,54,.06), 0 24px 60px -20px rgba(20,28,54,.35);
+    border-radius: 2px;
+    border-top: 6px solid var(--accent);
+    box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 12px 40px rgba(0,0,0,.12);
     padding: 14mm 14mm 12mm;
     display: flex; flex-direction: column; gap: 6.5mm;
     font-size: 12.5px;
@@ -86,32 +86,30 @@
   }
   @keyframes rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
 
-  .letterhead { display: flex; align-items: center; justify-content: space-between; padding-bottom: 5mm; border-bottom: 1px solid var(--line); }
+  .letterhead { display: flex; align-items: center; justify-content: space-between; padding-bottom: 5mm; border-bottom: 2px solid var(--primary); }
   .letterhead-brand { display: flex; align-items: center; gap: 12px; }
-  .letterhead-mark { width: 44px; height: 44px; object-fit: contain; border-radius: 12px; border: 1px solid var(--line); padding: 3px; background: #fff; }
-  .letterhead-name { font-weight: 700; font-size: 15px; color: var(--ink); line-height: 1.2; }
+  .letterhead-mark { width: 46px; height: 46px; object-fit: contain; background: #fff; }
+  .letterhead-name { font-family: 'Source Serif 4', Georgia, serif; font-weight: 600; font-size: 18px; color: var(--ink); line-height: 1.2; }
   .letterhead-sub { font-size: 11px; color: var(--ink3); font-weight: 500; }
   .letterhead-doc { text-align: right; }
   .letterhead-doc-title { font-size: 10.5px; font-weight: 650; letter-spacing: .9px; text-transform: uppercase; color: var(--accent-ink); }
   .letterhead-doc-ref { font-size: 11px; color: var(--ink3); margin-top: 3px; font-variant-numeric: tabular-nums; }
 
   /* En-tête client, dans l'esprit de la fiche du logiciel */
-  .hero { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+  .hero { border: 0; overflow: hidden; }
   .identity {
     display: flex; align-items: center; gap: 16px; padding: 6mm;
-    background:
-      radial-gradient(60% 120% at 100% 0%, var(--accent-50) 0%, transparent 60%),
-      linear-gradient(180deg, var(--primary-50) 0%, #fff 100%);
+    padding: 2mm 0 5mm;
   }
-  .identity-logo { width: 64px; height: 64px; border-radius: 16px; border: 1px solid var(--line); background: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+  .identity-logo { width: 64px; height: 64px; border-radius: 10px; border: 1px solid var(--line); background: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
   .identity-logo img { width: 100%; height: 100%; object-fit: contain; padding: 4px; }
-  .identity-logo-fallback { font-weight: 700; font-size: 20px; color: var(--primary); }
+  .identity-logo-fallback { font-family: 'Source Serif 4', Georgia, serif; font-weight: 600; font-size: 22px; color: var(--primary); }
   .identity-main { flex: 1; min-width: 0; }
-  .identity-name { font-weight: 700; font-size: 21px; letter-spacing: -.4px; color: var(--ink); line-height: 1.2; text-wrap: balance; }
-  .identity-code { display: inline-block; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 11px; color: var(--ink2); background: var(--neutral-bg); border-radius: 999px; padding: 2px 9px; margin-top: 6px; }
+  .identity-name { font-family: 'Source Serif 4', Georgia, serif; font-weight: 500; font-size: 28px; letter-spacing: -.01em; color: var(--ink); line-height: 1.2; text-wrap: balance; }
+  .identity-code { display: inline-block; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 11px; color: var(--ink2); background: var(--neutral-bg); border-radius: 4px; padding: 2px 9px; margin-top: 6px; }
   .identity-code:empty { display: none; }
   .identity-badges { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 45%; }
-  .pill { display: inline-flex; align-items: center; gap: 6px; font-weight: 550; font-size: 11px; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; font-weight: 500; font-size: 11px; padding: 2px 8px; border-radius: 4px; white-space: nowrap; }
   .pill-dot::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
   .pill-regulier { background: var(--info-bg); color: var(--info); }
   .pill-occasionnel { background: var(--accent-50); color: var(--accent-ink); }
@@ -120,17 +118,17 @@
   .pill-termine { background: var(--neutral-bg); color: var(--neutral); }
   .pill-categorie { background: var(--neutral-bg); color: var(--neutral); }
 
-  .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); }
-  .stat { padding: 3.5mm 6mm; display: flex; flex-direction: column; gap: 2px; }
-  .stat + .stat { border-left: 1px solid var(--line); }
-  .stat-label { font-size: 10px; color: var(--ink3); font-weight: 500; }
-  .stat-value { font-size: 13.5px; font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line-strong); border-bottom: 1px solid var(--line-strong); }
+  .stat { padding: 3.5mm 4mm 3.5mm 0; display: flex; flex-direction: column; gap: 2px; }
+  .stat + .stat { border-left: 1px solid var(--line); padding-left: 4mm; }
+  .stat-label { font-size: 9.5px; color: var(--ink3); font-weight: 500; letter-spacing: .12em; text-transform: uppercase; }
+  .stat-value { font-family: 'Source Serif 4', Georgia, serif; font-size: 16px; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums; }
   .stat-value small { font-weight: 450; color: var(--ink3); font-size: 11px; }
 
   /* Sections */
   .section { display: flex; flex-direction: column; break-inside: avoid; }
-  .section-label { font-weight: 650; font-size: 10.5px; letter-spacing: .8px; text-transform: uppercase; color: var(--ink3); display: flex; align-items: center; gap: 10px; margin-bottom: 3mm; }
-  .section-label::before { content: ''; width: 3px; height: 12px; border-radius: 2px; background: var(--accent); }
+  .section-label { font-family: 'Source Serif 4', Georgia, serif; font-weight: 500; font-size: 15px; color: var(--ink); display: flex; align-items: center; gap: 10px; margin-bottom: 3mm; }
+  .section-label::before { display: none; }
   .section-label::after { content: ""; flex: 1; height: 1px; background: var(--line); }
   .field-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm 6mm; }
   .field-grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
@@ -146,12 +144,12 @@
   .table .num { text-align: right; font-variant-numeric: tabular-nums; padding-right: 0; }
   .table tfoot td { border-top: 1px solid var(--line-strong); font-weight: 650; color: var(--ink); }
   .strong { font-weight: 600; color: var(--ink); }
-  .site-code { display: inline-block; font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 10px; color: var(--ink2); background: var(--neutral-bg); padding: 1px 7px; border-radius: 999px; margin-left: 6px; }
+  .site-code { display: inline-block; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 10px; color: var(--ink2); background: var(--neutral-bg); padding: 1px 6px; border-radius: 4px; margin-left: 6px; }
   .evo { font-size: 10.5px; font-weight: 600; margin-left: 6px; }
   .evo.up { color: var(--success); }
   .evo.down { color: #C0564E; }
 
-  .notes-box { font-size: 12.5px; color: var(--ink2); line-height: 1.55; background: var(--tint); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; padding: 3.5mm 5mm; white-space: pre-wrap; }
+  .notes-box { font-size: 12.5px; color: var(--ink2); line-height: 1.55; background: var(--tint); border-left: 3px solid var(--accent); border-radius: 0; padding: 3.5mm 5mm; white-space: pre-wrap; }
 
   .sheet-footer { margin-top: auto; padding-top: 4mm; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; font-size: 10px; color: var(--ink3); }
 
