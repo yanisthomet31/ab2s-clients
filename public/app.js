@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!me || !me.nom) { window.location.href = '/login.html'; return; }
   state.me = me;
   document.getElementById('connected-as').textContent = me.nom;
-  document.getElementById('user-avatar').textContent = me.nom.trim().charAt(0);
+  document.getElementById('user-avatar').textContent = me.nom.trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('');
   const h = new Date().getHours();
   document.getElementById('dash-greeting').textContent = `${h >= 18 || h < 5 ? 'Bonsoir' : 'Bonjour'} ${me.nom}`;
   document.getElementById('dash-date').textContent = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
@@ -167,7 +167,18 @@ function updateThemeButton() {
   const dark = currentTheme() === 'dark';
   document.getElementById('theme-icon').setAttribute('href', dark ? '#i-sun' : '#i-moon');
   document.getElementById('theme-label').textContent = dark ? 'Mode clair' : 'Mode sombre';
+  document.getElementById('theme-toggle').title = dark ? 'Mode clair' : 'Mode sombre';
 }
+
+// ─── MENU DU COMPTE (barre du haut) ───────────────────
+function toggleUserMenu(e) {
+  e.stopPropagation();
+  document.getElementById('user-menu').classList.toggle('open');
+}
+function closeUserMenu() { document.getElementById('user-menu').classList.remove('open'); }
+document.addEventListener('click', e => { if (!e.target.closest('#user-menu')) closeUserMenu(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeUserMenu(); });
+document.addEventListener('click', e => { if (e.target.closest('.user-pop .menu-item')) closeUserMenu(); });
 
 // ─── CLAVIER ──────────────────────────────────────────
 function setupKeyboard() {

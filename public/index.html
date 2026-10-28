@@ -16,7 +16,7 @@
 <link rel="icon" type="image/png" href="assets/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;450;500;550;600;650;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="style.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" defer></script>
@@ -68,58 +68,50 @@
 
 </svg>
 
-<!-- SIDEBAR -->
-<aside class="sidebar">
-  <div class="sidebar-logo">
-    <div class="logo-tile">
-      <img src="assets/logo.png" alt="AB2S Sécurité" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'">
-      <span id="logo-fallback" class="logo-fallback" style="display:none">AB2S</span>
-    </div>
-    <div class="brand-text">
-      <span class="brand-name">AB2S Sécurité</span>
+<!-- BARRE DU HAUT -->
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="brand" href="#/dashboard" title="Tableau de bord">
+      <span class="logo-tile">
+        <img src="assets/logo.png" alt="AB2S Sécurité" onerror="this.style.display='none';document.getElementById('logo-fallback').style.display='block'">
+        <span id="logo-fallback" class="logo-fallback" style="display:none">AB2S</span>
+      </span>
+      <span class="brand-name">AB2S</span>
       <span class="brand-sub">Base clients</span>
-    </div>
-  </div>
+    </a>
 
-  <button class="search-trigger" onclick="openPalette()" title="Recherche rapide">
-    <svg class="i"><use href="#i-search"/></svg><span>Rechercher…</span><kbd id="kbd-hint">Ctrl K</kbd>
-  </button>
+    <nav class="topnav">
+      <a class="nav-item active" data-tab="dashboard" href="#/dashboard">Tableau de bord</a>
+      <a class="nav-item" data-tab="clients" href="#/clients">Clients</a>
+      <a class="nav-item" data-tab="ca" href="#/ca">Chiffre d'affaires</a>
+      <a class="nav-item" data-tab="sites" href="#/sites">Sites</a>
+      <a class="nav-item" data-tab="carte" href="#/carte">Carte</a>
+    </nav>
 
-  <div class="sidebar-section">Navigation</div>
-  <nav class="sidebar-nav">
-    <a class="nav-item active" data-tab="dashboard" href="#/dashboard">
-      <span class="nav-icon"><svg class="i"><use href="#i-dashboard"/></svg></span><span>Tableau de bord</span>
-    </a>
-    <a class="nav-item" data-tab="clients" href="#/clients">
-      <span class="nav-icon"><svg class="i"><use href="#i-building"/></svg></span><span>Clients</span>
-    </a>
-    <a class="nav-item" data-tab="ca" href="#/ca">
-      <span class="nav-icon"><svg class="i"><use href="#i-book"/></svg></span><span>Chiffre d'affaires</span>
-    </a>
-    <a class="nav-item" data-tab="sites" href="#/sites">
-      <span class="nav-icon"><svg class="i"><use href="#i-pin"/></svg></span><span>Sites</span>
-    </a>
-    <a class="nav-item" data-tab="carte" href="#/carte">
-      <span class="nav-icon"><svg class="i"><use href="#i-map"/></svg></span><span>Carte des clients</span>
-    </a>
-  </nav>
-
-  <div class="sidebar-footer">
-    <button class="btn-export" onclick="toggleTheme()" id="theme-toggle">
-      <svg class="i"><use href="#i-moon" id="theme-icon"/></svg><span id="theme-label">Mode sombre</span>
-    </button>
-    <button class="btn-export" onclick="exportCSV()"><svg class="i"><use href="#i-download"/></svg><span>Exporter en CSV</span></button>
-    <button class="btn-export" onclick="changePassword()"><svg class="i"><use href="#i-key"/></svg><span>Mot de passe</span></button>
-    <button class="btn-export danger" onclick="logout()"><svg class="i"><use href="#i-logout"/></svg><span>Déconnexion</span></button>
-    <div class="user-chip mt8">
-      <div class="user-avatar" id="user-avatar">·</div>
-      <div>
-        <div class="sidebar-version" id="connected-as">Connecté</div>
-        <div class="user-role">Session active</div>
+    <div class="topbar-tools">
+      <button class="search-trigger" onclick="openPalette()" title="Recherche rapide">
+        <svg class="i i-sm"><use href="#i-search"/></svg><span>Rechercher un client ou un code</span><kbd id="kbd-hint">Ctrl K</kbd>
+      </button>
+      <button class="top-icon" onclick="toggleTheme()" id="theme-toggle" title="Mode sombre">
+        <svg class="i"><use href="#i-moon" id="theme-icon"/></svg><span class="sr-only" id="theme-label">Mode sombre</span>
+      </button>
+      <div class="user-menu" id="user-menu">
+        <button class="user-btn" onclick="toggleUserMenu(event)" title="Mon compte" aria-haspopup="true">
+          <span class="user-avatar" id="user-avatar">·</span>
+        </button>
+        <div class="user-pop" id="user-pop">
+          <div class="user-pop-head">
+            <div class="user-name" id="connected-as">Connecté</div>
+            <div class="user-role">Session active · déconnexion après 30 min d'inactivité</div>
+          </div>
+          <button class="menu-item" onclick="exportCSV()"><svg class="i i-sm"><use href="#i-download"/></svg>Exporter en CSV</button>
+          <button class="menu-item" onclick="changePassword()"><svg class="i i-sm"><use href="#i-key"/></svg>Changer mon mot de passe</button>
+          <button class="menu-item danger" onclick="logout()"><svg class="i i-sm"><use href="#i-logout"/></svg>Déconnexion</button>
+        </div>
       </div>
     </div>
   </div>
-</aside>
+</header>
 
 <!-- MAIN -->
 <main class="main">
