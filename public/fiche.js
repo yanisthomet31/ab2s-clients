@@ -45,10 +45,8 @@
   if (data.categorie_client) pillCat.textContent = data.categorie_client; else pillCat.remove();
 
   // Bandeau de synthèse
-  const annee = new Date().getFullYear();
   const qualif = t => t.qualification || 'Général';
   const tarifs = [...(data.tarifs || [])].sort((a, b) => b.annee - a.annee || qualif(a).localeCompare(qualif(b), 'fr'));
-  const ca = data.ca || [];
   set('s-debut', data.date_debut_contrat ? formatDate(data.date_debut_contrat) : '');
   set('s-fin', data.tacite_reconduction ? 'Tacite reconduction' : (data.date_fin_contrat ? formatDate(data.date_fin_contrat) : ''));
   if (tarifs.length) {
@@ -59,8 +57,8 @@
   } else if (Number(data.tarif)) {
     document.getElementById('s-tarif').innerHTML = `${eur(data.tarif, 2)} <small>${esc(data.tarif_unite || '')}</small>`;
   } else set('s-tarif', '');
-  document.getElementById('s-ca-label').textContent = `CA ${annee}`;
-  set('s-ca', eur(ca.filter(e => e.mois.startsWith(String(annee))).reduce((s, e) => s + Number(e.montant), 0)));
+  const nbSites = (data.sites || []).length;
+  set('s-sites', nbSites ? `${nbSites} site${nbSites > 1 ? 's' : ''}` : '');
 
   // Coordonnées
   set('f-contact-nom', data.contact_nom);
@@ -102,7 +100,7 @@
       </tr>`).join('');
   }
 
-  // Tarifs (avec évolution) et CA par année
+  // Tarifs (avec évolution). Le chiffre d'affaires n'apparaît pas sur la fiche : il reste dans le logiciel.
   if (tarifs.length) {
     // Sur la fiche : seulement l'année la plus récente (l'historique complet reste dans le logiciel)
     document.getElementById('tarifs-tbody').innerHTML = tarifs.filter(t => t.annee === tarifs[0].annee).map(t => {
@@ -112,18 +110,8 @@
         ? `<span class="evo ${evo >= 0 ? 'up' : 'down'}">${evo >= 0 ? '+' : ''}${evo.toFixed(1).replace('.', ',')} %</span>` : ''}</td></tr>`;
     }).join('');
   } else {
-    document.getElementById('table-tarifs').style.display = 'none';
+    document.getElementById('section-finances').style.display = 'none';
   }
-  const parAnnee = {};
-  ca.forEach(e => { const y = e.mois.slice(0, 4); parAnnee[y] = (parAnnee[y] || 0) + Number(e.montant); });
-  const annees = Object.keys(parAnnee).sort().reverse().slice(0, 5);
-  if (annees.length) {
-    document.getElementById('ca-tbody').innerHTML = annees.map(y =>
-      `<tr><td class="strong">${y}${y === String(annee) ? ' <span style="color:var(--ink3);font-weight:450">(en cours)</span>' : ''}</td><td class="num">${eur(parAnnee[y], 2)}</td></tr>`).join('');
-  } else {
-    document.getElementById('table-ca').style.display = 'none';
-  }
-  if (!tarifs.length && !annees.length) document.getElementById('section-finances').style.display = 'none';
 
   // Notes
   if (!data.notes) {

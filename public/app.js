@@ -489,6 +489,7 @@ async function loadClients() {
 async function loadClientPage(id) {
   const page = document.getElementById('client-page');
   if (state.clientId !== id || !state.client) {
+    if (state.clientId !== id) { state.clientTab = 'synthese'; state.clientCaYear = null; }
     state.client = null;
     page.innerHTML = clientPageSkeleton();
   }
@@ -513,70 +514,114 @@ async function refreshClient() {
   if (state.page === 'client') renderClientView();
 }
 
+const CLIENT_TABS = [
+  ['synthese', 'Synthèse'], ['ca', "Chiffre d'affaires"], ['contacts', 'Contacts'], ['sites', 'Sites'],
+  ['tarifs', 'Tarifs horaires'], ['documents', 'Documents'], ['historique', 'Historique']
+];
+
 function clientPageLayout() {
   const moisCourant = monthKey(new Date());
   return `
     <a class="back-link" href="#/clients">${ic('back')}Clients</a>
     <div id="client-hero"></div>
-    <div class="client-grid">
-      <div class="client-col">
-        ${block({ id: 'ca', icon: 'trend', title: "Chiffre d'affaires", addLabel: 'Saisir un montant', form: `
-          <form class="inline-form" onsubmit="addCaEntry(event)">
-            <div class="form-group"><label>Mois</label><input type="month" name="mois" value="${moisCourant}" required></div>
-            <div class="form-group grow"><label>Libellé</label><input type="text" name="libelle" placeholder="Prestation réalisée…"></div>
-            <div class="form-group"><label>Montant HT (€)</label><input type="number" name="montant" step="0.01" placeholder="0,00" required></div>
-            <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
-          </form>` })}
-        ${block({ id: 'historique', icon: 'history', title: 'Historique', addLabel: 'Ajouter une entrée', form: `
-          <form class="inline-form" onsubmit="addHistorique(event)">
-            <div class="form-group"><label>Type</label>
-              <select name="type"><option>Échange</option><option>Incident</option><option>Renouvellement</option><option>Note</option></select>
-            </div>
-            <div class="form-group grow"><label>Description</label><input type="text" name="description" placeholder="Que s'est-il passé ?" required></div>
-            <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
-          </form>` })}
-      </div>
-      <div class="client-col">
+    <nav class="client-tabs" role="tablist">
+      ${CLIENT_TABS.map(([id, label]) => `
+        <button type="button" class="client-tab" role="tab" data-ctab="${id}" onclick="setClientTab('${id}')">${label}<span class="tab-count" id="tabcount-${id}"></span></button>`).join('')}
+    </nav>
+
+    <section class="client-panel" data-cpanel="synthese">
+      <div class="synth-grid">
         ${block({ id: 'infos', icon: 'info', title: 'Informations', headAction: `<button class="btn-ghost btn-sm" onclick="openClientModal(state.clientId)">${ic('edit')}Modifier</button>` })}
-        ${block({ id: 'contacts', icon: 'users', title: 'Contacts', addLabel: 'Ajouter', form: `
-          <form class="inline-form wrap" onsubmit="addContact(event)">
-            <div class="form-group grow"><label>Nom</label><input type="text" name="nom" placeholder="Nom Prénom" required></div>
-            <div class="form-group grow"><label>Poste</label><input type="text" name="poste" placeholder="Poste"></div>
-            <div class="form-group grow"><label>Téléphone</label><input type="tel" name="telephone" placeholder="06 00 00 00 00"></div>
-            <div class="form-group grow"><label>Email</label><input type="email" name="email" placeholder="nom@societe.fr"></div>
-            <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
-          </form>` })}
-        ${block({ id: 'sites', icon: 'pin', title: 'Sites', addLabel: 'Ajouter', form: `
-          <form class="inline-form wrap" onsubmit="addSite(event)">
-            <div class="form-group grow"><label>Nom du site</label><input type="text" name="nom_site" placeholder="Entrepôt Nord" required></div>
-            <div class="form-group"><label>Code</label><input type="text" name="code_site" placeholder="S-01" style="width:110px"></div>
-            <div class="form-group grow full"><label>Adresse</label><input type="text" name="adresse_site" placeholder="Adresse complète (sert à la carte)"></div>
-            <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
-          </form>` })}
-        ${block({ id: 'tarifs', icon: 'euro', title: 'Tarifs horaires', addLabel: 'Ajouter', form: `
-          <form class="inline-form wrap" onsubmit="addTarif(event)">
-            <div class="form-group grow"><label>Qualification</label>
-              <input type="text" name="qualification" list="qualifs-list" placeholder="ADS, SSIAP 1…" autocomplete="off" required>
-              <datalist id="qualifs-list">${QUALIFICATIONS.map(q => `<option value="${q}">`).join('')}</datalist>
-            </div>
-            <div class="form-group"><label>Année</label><input type="number" name="annee" value="${new Date().getFullYear()}" style="width:90px" required></div>
-            <div class="form-group"><label>Taux horaire (€)</label><input type="number" name="taux_horaire" step="0.01" min="0" placeholder="0,00" style="width:120px" required></div>
-            <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
-          </form>` })}
-        ${block({ id: 'documents', icon: 'file', title: 'Documents', form: null, headAction: `
-          <select id="doc-type" class="filter-select select-sm" title="Type des prochains documents envoyés">
-            <option value="devis">Devis</option><option value="contrat">Contrat</option>
-            <option value="facture">Facture</option><option value="autre">Autre</option>
-          </select>`, pre: `
-          <label class="dropzone" id="dropzone"
-                 ondragover="dzOver(event)" ondragleave="dzLeave(event)" ondrop="dzDrop(event)">
-            <input type="file" multiple hidden onchange="uploadDocuments(this.files); this.value=''">
-            <span class="dz-icon">${ic('upload', 'i-lg')}</span>
-            <span class="dz-title">Glissez vos fichiers ici</span>
-            <span class="dz-sub">ou cliquez pour parcourir</span>
-          </label>` })}
+        <div class="card block" id="blk-apercu"><div class="block-body" id="body-apercu"></div></div>
       </div>
-    </div>`;
+    </section>
+
+    <section class="client-panel" data-cpanel="ca">
+      ${block({ id: 'ca', icon: 'trend', title: "Chiffre d'affaires", addLabel: 'Saisir un montant',
+        headAction: `<select id="ca-year-select" class="filter-select select-sm" onchange="state.clientCaYear = this.value; renderClientCa()" title="Année affichée"></select>`,
+        form: `
+          <form class="inline-form wrap" onsubmit="addCaEntry(event)" oninput="updateTvaPreview(this)">
+            <div class="form-group"><label>Mois</label><input type="month" name="mois" value="${moisCourant}" required></div>
+            <div class="form-group"><label>N° de facture</label><input type="text" name="numero_facture" placeholder="FA-2026-001" style="width:150px"></div>
+            <div class="form-group" id="ca-site-group"></div>
+            <div class="form-group grow"><label>Libellé</label><input type="text" name="libelle" placeholder="Prestation réalisée…"></div>
+            <div class="form-group"><label>Montant HT (€)</label><input type="number" name="montant" step="0.01" placeholder="0,00" style="width:140px" required></div>
+            <div class="tva-preview" id="tva-preview"><span>TVA 20 % <b>—</b></span><span>TTC <b>—</b></span></div>
+            <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
+          </form>` })}
+    </section>
+
+    <section class="client-panel" data-cpanel="contacts">
+      ${block({ id: 'contacts', icon: 'users', title: 'Contacts', addLabel: 'Ajouter un contact', form: `
+        <form class="inline-form wrap" onsubmit="addContact(event)">
+          <div class="form-group grow"><label>Nom</label><input type="text" name="nom" placeholder="Nom Prénom" required></div>
+          <div class="form-group grow"><label>Poste</label><input type="text" name="poste" placeholder="Poste"></div>
+          <div class="form-group grow"><label>Téléphone</label><input type="tel" name="telephone" placeholder="06 00 00 00 00"></div>
+          <div class="form-group grow"><label>Email</label><input type="email" name="email" placeholder="nom@societe.fr"></div>
+          <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
+        </form>` })}
+    </section>
+
+    <section class="client-panel" data-cpanel="sites">
+      ${block({ id: 'sites', icon: 'pin', title: 'Sites', addLabel: 'Ajouter un site', form: `
+        <form class="inline-form wrap" onsubmit="addSite(event)">
+          <div class="form-group grow"><label>Nom du site</label><input type="text" name="nom_site" placeholder="Entrepôt Nord" required></div>
+          <div class="form-group"><label>Code</label><input type="text" name="code_site" placeholder="S-01" style="width:110px"></div>
+          <div class="form-group grow full"><label>Adresse</label><input type="text" name="adresse_site" placeholder="Adresse complète (sert à la carte)"></div>
+          <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
+        </form>` })}
+    </section>
+
+    <section class="client-panel" data-cpanel="tarifs">
+      ${block({ id: 'tarifs', icon: 'euro', title: 'Tarifs horaires', addLabel: 'Ajouter un tarif', form: `
+        <form class="inline-form wrap" onsubmit="addTarif(event)">
+          <div class="form-group grow"><label>Qualification</label>
+            <input type="text" name="qualification" list="qualifs-list" placeholder="ADS, SSIAP 1…" autocomplete="off" required>
+            <datalist id="qualifs-list">${QUALIFICATIONS.map(q => `<option value="${q}">`).join('')}</datalist>
+          </div>
+          <div class="form-group"><label>Année</label><input type="number" name="annee" value="${new Date().getFullYear()}" style="width:90px" required></div>
+          <div class="form-group"><label>Taux horaire (€)</label><input type="number" name="taux_horaire" step="0.01" min="0" placeholder="0,00" style="width:120px" required></div>
+          <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
+        </form>` })}
+    </section>
+
+    <section class="client-panel" data-cpanel="documents">
+      ${block({ id: 'documents', icon: 'file', title: 'Documents', form: null, headAction: `
+        <select id="doc-type" class="filter-select select-sm" title="Type des prochains documents envoyés">
+          <option value="devis">Devis</option><option value="contrat">Contrat</option>
+          <option value="facture">Facture</option><option value="autre">Autre</option>
+        </select>`, pre: `
+        <label class="dropzone" id="dropzone"
+               ondragover="dzOver(event)" ondragleave="dzLeave(event)" ondrop="dzDrop(event)">
+          <input type="file" multiple hidden onchange="uploadDocuments(this.files); this.value=''">
+          <span class="dz-icon">${ic('upload', 'i-lg')}</span>
+          <span class="dz-title">Glissez vos fichiers ici</span>
+          <span class="dz-sub">ou cliquez pour parcourir · 20 Mo maximum par fichier</span>
+        </label>` })}
+    </section>
+
+    <section class="client-panel" data-cpanel="historique">
+      ${block({ id: 'historique', icon: 'history', title: 'Historique', addLabel: 'Ajouter une entrée', form: `
+        <form class="inline-form" onsubmit="addHistorique(event)">
+          <div class="form-group"><label>Type</label>
+            <select name="type"><option>Échange</option><option>Incident</option><option>Renouvellement</option><option>Note</option></select>
+          </div>
+          <div class="form-group grow"><label>Description</label><input type="text" name="description" placeholder="Que s'est-il passé ?" required></div>
+          <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
+        </form>` })}
+    </section>`;
+}
+
+function setClientTab(tab) {
+  if (!CLIENT_TABS.some(([id]) => id === tab)) tab = 'synthese';
+  state.clientTab = tab;
+  document.querySelectorAll('.client-tab').forEach(b => {
+    const on = b.dataset.ctab === tab;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-selected', on);
+  });
+  document.querySelectorAll('.client-panel').forEach(p => { p.hidden = p.dataset.cpanel !== tab; });
+  if (tab === 'ca') renderClientCaChart();
 }
 
 function block({ id, icon, title, addLabel, form, headAction = '', pre = '' }) {
@@ -620,20 +665,23 @@ function renderClientView() {
   renderSites();
   renderTarifs();
   renderDocuments();
+  renderApercu();
+  setClientTab(state.clientTab || 'synthese');
 }
 
 function setCount(id, n) {
-  document.getElementById('count-' + id).textContent = n ? n : '';
+  const blockCount = document.getElementById('count-' + id);
+  if (blockCount) blockCount.textContent = n ? n : '';
+  const tabCount = document.getElementById('tabcount-' + id);
+  if (tabCount) tabCount.textContent = n ? n : '';
 }
 
 function renderClientHero(c) {
-  const annee = new Date().getFullYear();
-  const caAnnee = (c.ca || []).filter(e => e.mois.startsWith(String(annee)) && !isPending('ca', e.id))
-    .reduce((s, e) => s + Number(e.montant), 0);
   const tarifs = (c.tarifs || []).filter(t => !isPending('tarifs', t.id));
   const derniereAnnee = tarifs.length ? Math.max(...tarifs.map(t => t.annee)) : null;
   const tarifsAnnee = tarifs.filter(t => t.annee === derniereAnnee).map(t => Number(t.taux_horaire));
   const tarifMin = Math.min(...tarifsAnnee), tarifMax = Math.max(...tarifsAnnee);
+  const nbSites = (c.sites || []).filter(s => !isPending('sites', s.id)).length;
   const jours = c.date_fin_contrat ? daysUntil(c.date_fin_contrat) : null;
   const tel = c.contact_telephone || (c.contacts || []).find(k => k.telephone)?.telephone;
   const mail = c.contact_email || (c.contacts || []).find(k => k.email)?.email;
@@ -643,22 +691,17 @@ function renderClientHero(c) {
       <div class="hero-main">
         ${clientAvatar(c, 'xl')}
         <div class="hero-id">
-          <div class="hero-title">
-            <h1>${esc(c.societe)}</h1>
-            ${c.code_client ? `<span class="segment-badge">${esc(c.code_client)}</span>` : ''}
-          </div>
-          <div class="hero-pills">
+          <div class="eyebrow">${[c.code_client, c.categorie_client].filter(Boolean).map(esc).join(' · ') || 'Client'}</div>
+          <div class="hero-title"><h1>${esc(c.societe)}</h1></div>
+          <div class="hero-meta">
             ${statutPill(c.statut)}
             ${typeClientPill(c.type_client)}
-            ${c.categorie_client ? `<span class="pill pill-neutral">${esc(c.categorie_client)}</span>` : ''}
-          </div>
-          <div class="hero-meta">
-            ${[c.type_prestation, c.ville].filter(Boolean).map(esc).join(' · ')}
+            ${[c.type_prestation, c.ville].filter(Boolean).map(v => `<span class="hero-meta-item">${esc(v)}</span>`).join('')}
           </div>
         </div>
         <div class="hero-actions">
-          ${tel ? `<a class="btn-ghost" href="tel:${esc(tel)}" title="${esc(tel)}">${ic('phone')}Appeler</a>` : ''}
-          ${mail ? `<a class="btn-ghost" href="mailto:${esc(mail)}" title="${esc(mail)}">${ic('mail')}Email</a>` : ''}
+          ${tel ? `<a class="btn-ghost btn-icon" href="tel:${esc(tel)}" title="Appeler ${esc(tel)}">${ic('phone')}</a>` : ''}
+          ${mail ? `<a class="btn-ghost btn-icon" href="mailto:${esc(mail)}" title="Écrire à ${esc(mail)}">${ic('mail')}</a>` : ''}
           <button class="btn-ghost" onclick="ouvrirFichePDF()">${ic('printer')}Fiche PDF</button>
           <button class="btn-primary" onclick="openClientModal(state.clientId)">${ic('edit')}Modifier</button>
           <button class="btn-ghost btn-icon danger-hover" onclick="deleteClient()" title="Supprimer le client">${ic('trash')}</button>
@@ -677,15 +720,49 @@ function renderClientHero(c) {
         <div class="hero-stat">
           <span class="hs-label">${derniereAnnee ? `Tarif${tarifsAnnee.length > 1 ? 's' : ''} horaire${tarifsAnnee.length > 1 ? 's' : ''} ${derniereAnnee}` : 'Tarif contractuel'}</span>
           <span class="hs-value">${derniereAnnee
-            ? (tarifMin === tarifMax ? `${fmtEUR(tarifMin, 2)} <small>/ h</small>` : `${fmtEUR(tarifMin, 2)} à ${fmtEUR(tarifMax, 2)} <small>/ h · ${tarifsAnnee.length} qualifs</small>`)
+            ? (tarifMin === tarifMax ? `${fmtEUR(tarifMin, 2)} <small>/ h</small>` : `${fmtEUR(tarifMin, 2)} à ${fmtEUR(tarifMax, 2)} <small>/ h</small>`)
             : Number(c.tarif) ? `${fmtEUR(c.tarif, 2)} <small>${esc(c.tarif_unite || '')}</small>` : '—'}</span>
         </div>
         <div class="hero-stat">
-          <span class="hs-label">CA ${annee}</span>
-          <span class="hs-value">${fmtEUR(caAnnee)}</span>
+          <span class="hs-label">Sites</span>
+          <span class="hs-value">${nbSites ? `${nbSites} site${nbSites > 1 ? 's' : ''}` : '—'}</span>
         </div>
       </div>
     </div>`;
+}
+
+// Synthèse : l'essentiel des autres onglets, en un coup d'œil
+function renderApercu() {
+  const c = state.client;
+  const contacts = (c.contacts || []).filter(k => !isPending('contacts', k.id));
+  const sites = (c.sites || []).filter(x => !isPending('sites', x.id));
+  const tarifs = (c.tarifs || []).filter(t => !isPending('tarifs', t.id));
+  const annee = tarifs.length ? Math.max(...tarifs.map(t => t.annee)) : null;
+  const tarifsAnnee = tarifs.filter(t => t.annee === annee)
+    .sort((x, y) => (x.qualification || 'Général').localeCompare(y.qualification || 'Général', 'fr'));
+  const dernier = (c.historique || []).filter(h => !isPending('historique', h.id))[0];
+  const section = (title, tab, body) => `
+    <div class="apercu-section">
+      <div class="apercu-head"><h4>${title}</h4><button type="button" class="link" onclick="setClientTab('${tab}')">Tout voir ${ic('arrow', 'i-sm')}</button></div>
+      ${body}
+    </div>`;
+  const vide = txt => `<p class="apercu-empty">${txt}</p>`;
+  document.getElementById('body-apercu').innerHTML =
+    section('Contacts', 'contacts', contacts.length ? contacts.slice(0, 3).map(k => `
+      <div class="apercu-row">
+        <span><b>${esc(k.nom)}</b>${k.poste ? ` <span class="muted">· ${esc(k.poste)}</span>` : ''}</span>
+        ${k.telephone ? `<a href="tel:${esc(k.telephone)}">${esc(k.telephone)}</a>` : k.email ? `<a href="mailto:${esc(k.email)}">${esc(k.email)}</a>` : ''}
+      </div>`).join('') : vide('Aucun contact enregistré')) +
+    section(annee ? `Tarifs horaires ${annee}` : 'Tarifs horaires', 'tarifs', tarifsAnnee.length ? tarifsAnnee.map(t => `
+      <div class="apercu-row"><span>${esc(t.qualification || 'Général')}</span><b class="num">${fmtEUR(t.taux_horaire, 2)} <small class="muted">/ h</small></b></div>`).join('')
+      : vide('Aucun tarif enregistré')) +
+    section('Sites', 'sites', sites.length ? sites.slice(0, 3).map(x => `
+      <div class="apercu-row"><span>${esc(x.nom_site)}${x.code_site ? ` <span class="muted mono">${esc(x.code_site)}</span>` : ''}</span><span class="muted apercu-addr">${esc(x.adresse_site || '')}</span></div>`).join('')
+      + (sites.length > 3 ? `<p class="apercu-more">et ${sites.length - 3} autre${sites.length - 3 > 1 ? 's' : ''}</p>` : '')
+      : vide('Aucun site enregistré')) +
+    section('Dernier événement', 'historique', dernier ? `
+      <div class="apercu-event"><b>${esc(dernier.type)}</b> <span class="muted">· ${formatDate(dernier.date)}</span><p>${esc(dernier.description)}</p></div>`
+      : vide("Aucun événement pour le moment"));
 }
 
 function renderInfos(c) {
@@ -704,46 +781,107 @@ function renderInfos(c) {
 }
 
 // ─── Chiffre d'affaires du client ─────────────────────
+const TAUX_TVA = 0.20;
+const tvaDe = ht => Math.round(Number(ht) * TAUX_TVA * 100) / 100;
+
 function renderClientCa() {
-  const rows = (state.client.ca || []).filter(e => !isPending('ca', e.id));
+  const c = state.client;
+  const rows = (c.ca || []).filter(e => !isPending('ca', e.id));
+  const sites = (c.sites || []).filter(x => !isPending('sites', x.id));
   setCount('ca', rows.length);
+
+  // Site : facultatif, proposé dès que le client a au moins un site
+  const siteGroup = document.getElementById('ca-site-group');
+  const siteChoisi = siteGroup.querySelector('select')?.value || '';
+  siteGroup.hidden = !sites.length;
+  siteGroup.innerHTML = sites.length ? `<label>Site <span class="muted">(facultatif)</span></label>
+    <select name="site_id"><option value="">Tous / non précisé</option>${sites.map(x =>
+      `<option value="${x.id}" ${String(x.id) === siteChoisi ? 'selected' : ''}>${esc(x.nom_site)}${x.code_site ? ` (${esc(x.code_site)})` : ''}</option>`).join('')}</select>` : '';
+
+  // Menu déroulant des années (+ « Toutes les années »)
+  const anneeCourante = String(new Date().getFullYear());
+  const annees = [...new Set([anneeCourante, ...rows.map(e => e.mois.slice(0, 4))])].sort().reverse();
+  if (!state.clientCaYear || (state.clientCaYear !== 'tous' && !annees.includes(state.clientCaYear))) state.clientCaYear = anneeCourante;
+  const annee = state.clientCaYear;
+  document.getElementById('ca-year-select').innerHTML =
+    annees.map(y => `<option value="${y}" ${y === annee ? 'selected' : ''}>${y}</option>`).join('') +
+    `<option value="tous" ${annee === 'tous' ? 'selected' : ''}>Toutes les années</option>`;
+
   const el = document.getElementById('body-ca');
   if (!rows.length) {
     el.innerHTML = emptyBlock('trend', 'Aucun montant saisi pour ce client', `<button class="btn-ghost btn-sm mt12" onclick="toggleAdd('ca')">${ic('plus')}Saisir le premier montant</button>`);
     return;
   }
-  const byYear = {};
-  rows.forEach(e => (byYear[e.mois.slice(0, 4)] ||= []).push(e));
-  const years = Object.keys(byYear).sort().reverse();
+
+  const lignes = annee === 'tous' ? rows : rows.filter(e => e.mois.startsWith(annee));
+  const somme = list => list.reduce((s, e) => s + Number(e.montant), 0);
+  const ht = somme(lignes), tva = lignes.reduce((s, e) => s + tvaDe(e.montant), 0);
+  const totalHT = somme(rows), totalTVA = rows.reduce((s, e) => s + tvaDe(e.montant), 0);
+  const premier = rows.map(e => e.mois).sort()[0];
+  const libAnnee = annee === 'tous' ? 'toutes années' : annee;
+  const avecSite = sites.length > 0 || lignes.some(e => e.nom_site);
+
   el.innerHTML = `
+    <div class="ca-stats">
+      <div><span class="hs-label">Total HT · ${libAnnee}</span><span class="ca-stat-value">${fmtEUR(ht, 2)}</span></div>
+      <div><span class="hs-label">TVA 20 %</span><span class="ca-stat-value">${fmtEUR(tva, 2)}</span></div>
+      <div><span class="hs-label">Total TTC · ${libAnnee}</span><span class="ca-stat-value">${fmtEUR(ht + tva, 2)}</span></div>
+      <div class="ca-stat-since"><span class="hs-label">Depuis le début</span><span class="ca-stat-value">${fmtEUR(totalHT, 2)} <small>HT</small></span>
+        <span class="ca-stat-sub">${fmtEUR(totalHT + totalTVA, 2)} TTC · depuis ${monthLong(premier).toLowerCase()}</span></div>
+    </div>
     <div id="chart-client-ca" class="chart chart-sm"></div>
-    <div class="ledger">
-      ${years.map(y => {
-        const tot = byYear[y].reduce((s, e) => s + Number(e.montant), 0);
-        return `
-        <div class="ledger-year">
-          <div class="ledger-year-head"><span>${y}</span><span>${fmtEUR(tot, 2)}</span></div>
-          ${byYear[y].map(e => `
-            <div class="ledger-row">
-              <span class="ledger-month">${monthLong(e.mois)}</span>
-              <span class="ledger-label">${esc(e.libelle) || '<span class="muted">—</span>'}${e.auteur ? `<small> · ${esc(e.auteur)}</small>` : ''}</span>
-              <span class="ledger-amount">${fmtEUR(e.montant, 2)}</span>
-              ${delBtn(`deleteCaEntry(${e.id})`)}
-            </div>`).join('')}
-        </div>`;
-      }).join('')}
-    </div>`;
+    ${lignes.length ? `
+    <div class="table-wrap ca-table-wrap">
+      <table class="table ca-table">
+        <thead><tr>
+          <th>Mois</th><th>N° facture</th>${avecSite ? '<th>Site</th>' : ''}<th>Libellé</th>
+          <th class="r">HT</th><th class="r">TVA 20 %</th><th class="r">TTC</th><th></th>
+        </tr></thead>
+        <tbody>${lignes.map(e => {
+          const t = tvaDe(e.montant);
+          return `<tr>
+            <td class="nowrap">${monthLong(e.mois)}</td>
+            <td>${e.numero_facture ? `<span class="mono">${esc(e.numero_facture)}</span>` : '<span class="muted">—</span>'}</td>
+            ${avecSite ? `<td>${e.nom_site ? esc(e.nom_site) : '<span class="muted">—</span>'}</td>` : ''}
+            <td>${esc(e.libelle) || '<span class="muted">—</span>'}${e.auteur ? `<small class="muted"> · ${esc(e.auteur)}</small>` : ''}</td>
+            <td class="r num strong">${fmtEUR(e.montant, 2)}</td>
+            <td class="r num muted">${fmtEUR(t, 2)}</td>
+            <td class="r num">${fmtEUR(Number(e.montant) + t, 2)}</td>
+            <td class="r">${delBtn(`deleteCaEntry(${e.id})`)}</td>
+          </tr>`;
+        }).join('')}</tbody>
+        <tfoot><tr>
+          <td colspan="${avecSite ? 4 : 3}">Total ${libAnnee}</td>
+          <td class="r num">${fmtEUR(ht, 2)}</td><td class="r num">${fmtEUR(tva, 2)}</td><td class="r num">${fmtEUR(ht + tva, 2)}</td><td><span></span></td>
+        </tr></tfoot>
+      </table>
+    </div>` : emptyBlock('trend', `Aucun montant saisi en ${annee}`)}`;
   renderClientCaChart();
 }
 
 function renderClientCaChart() {
   const el = document.getElementById('chart-client-ca');
-  if (!el) return;
+  if (!el || !el.offsetParent) return; // onglet masqué : dessiné à l'ouverture
   const map = {};
   (state.client.ca || []).filter(e => !isPending('ca', e.id)).forEach(e => { map[e.mois] = (map[e.mois] || 0) + Number(e.montant); });
-  const months = monthRange(addMonths(new Date(), -11), 12);
-  barChart(el, months.map(m => ({ label: monthShort(m), title: monthLong(m), value: map[m] || 0, current: m === monthKey(new Date()) })),
-    { height: 160, format: v => fmtEUR(v, 2), axisFormat: v => fmtEURCompact(v), empty: 'Aucun montant sur les 12 derniers mois' });
+  const annee = state.clientCaYear;
+  let data;
+  if (annee === 'tous') {
+    const parAnnee = {};
+    Object.entries(map).forEach(([m, v]) => { parAnnee[m.slice(0, 4)] = (parAnnee[m.slice(0, 4)] || 0) + v; });
+    data = Object.keys(parAnnee).sort().map(y => ({ label: y, title: y, value: parAnnee[y], current: y === String(new Date().getFullYear()) }));
+  } else {
+    data = monthRange(new Date(parseInt(annee), 0, 1), 12)
+      .map(m => ({ label: monthShort(m), title: monthLong(m), value: map[m] || 0, current: m === monthKey(new Date()) }));
+  }
+  barChart(el, data, { height: 170, format: v => `${fmtEUR(v, 2)} HT`, axisFormat: v => fmtEURCompact(v), empty: 'Aucun montant sur cette période' });
+}
+
+function updateTvaPreview(form) {
+  const ht = parseFloat(form.querySelector('[name=montant]').value);
+  const [tvaEl, ttcEl] = document.querySelectorAll('#tva-preview b');
+  tvaEl.textContent = Number.isFinite(ht) ? fmtEUR(tvaDe(ht), 2) : '—';
+  ttcEl.textContent = Number.isFinite(ht) ? fmtEUR(ht + tvaDe(ht), 2) : '—';
 }
 
 async function addCaEntry(e) {
@@ -752,10 +890,11 @@ async function addCaEntry(e) {
   if (!f.montant) return toast('Indiquez un montant', true);
   const r = await api(`/api/clients/${state.clientId}/ca`, { method: 'POST', body: f });
   if (!r || r.error) return toast((r && r.error) || 'Erreur', true);
-  e.target.querySelector('[name=libelle]').value = '';
-  e.target.querySelector('[name=montant]').value = '';
-  e.target.querySelector('[name=libelle]').focus();
-  toast(`${fmtEUR(f.montant, 2)} ajoutés pour ${monthLong(f.mois).toLowerCase()}`);
+  ['libelle', 'montant', 'numero_facture'].forEach(n => { e.target.querySelector(`[name=${n}]`).value = ''; });
+  updateTvaPreview(e.target);
+  e.target.querySelector('[name=numero_facture]').focus();
+  state.clientCaYear = f.mois.slice(0, 4);
+  toast(`${fmtEUR(f.montant, 2)} HT ajoutés pour ${monthLong(f.mois).toLowerCase()}`);
   refreshClient();
 }
 
@@ -764,7 +903,7 @@ function deleteCaEntry(id) {
   deleteWithUndo({
     key: `ca:${id}`, url: `/api/ca/${id}`,
     message: `Écriture de ${e ? fmtEUR(e.montant, 2) : ''} supprimée`,
-    rerender: () => { if (state.page === 'client') { renderClientCa(); renderClientHero(state.client); } if (state.page === 'ca') renderCa(); },
+    rerender: () => { if (state.page === 'client') renderClientCa(); if (state.page === 'ca') renderCa(); },
     after: () => { if (state.page === 'client') refreshClient(); if (state.page === 'ca') loadCa(); }
   });
 }
@@ -803,7 +942,7 @@ async function addHistorique(e) {
 
 function deleteHistorique(id) {
   deleteWithUndo({ key: `historique:${id}`, url: `/api/historique/${id}`, message: 'Événement supprimé',
-    rerender: renderHistorique, after: refreshClient });
+    rerender: () => { renderHistorique(); renderApercu(); }, after: refreshClient });
 }
 
 // ─── Contacts ─────────────────────────────────────────
@@ -844,7 +983,7 @@ async function addContact(e) {
 function deleteContact(id) {
   const c = state.client.contacts.find(x => x.id === id);
   deleteWithUndo({ key: `contacts:${id}`, url: `/api/contacts/${id}`, message: `Contact ${c ? c.nom : ''} supprimé`,
-    rerender: renderContacts, after: refreshClient });
+    rerender: () => { renderContacts(); renderApercu(); }, after: refreshClient });
 }
 
 // ─── Sites ────────────────────────────────────────────
@@ -881,7 +1020,7 @@ async function addSite(e) {
 function deleteSite(id) {
   const s = state.client.sites.find(x => x.id === id);
   deleteWithUndo({ key: `sites:${id}`, url: `/api/sites/${id}`, message: `Site ${s ? s.nom_site : ''} supprimé`,
-    rerender: renderSites, after: refreshClient });
+    rerender: () => { renderSites(); renderApercu(); }, after: refreshClient });
 }
 
 // ─── Tarifs ───────────────────────────────────────────
@@ -925,7 +1064,7 @@ async function addTarif(e) {
 
 function deleteTarif(id) {
   deleteWithUndo({ key: `tarifs:${id}`, url: `/api/tarifs/${id}`, message: 'Tarif supprimé',
-    rerender: () => { renderTarifs(); renderClientHero(state.client); }, after: refreshClient });
+    rerender: () => { renderTarifs(); renderApercu(); renderClientHero(state.client); }, after: refreshClient });
 }
 
 // ─── Documents (glisser-déposer) ──────────────────────
@@ -972,6 +1111,7 @@ async function uploadDocuments(files) {
     fd.append('type', type);
     const r = await api(`/api/clients/${state.clientId}/documents`, { method: 'POST', body: fd });
     if (r && r.id) ok++;
+    else if (r && r.error) toast(`${file.name} : ${r.error}`, true);
   }
   dz.classList.remove('busy');
   dz.querySelector('.dz-title').textContent = 'Glissez vos fichiers ici';
@@ -1231,8 +1371,8 @@ function renderCa() {
         <div class="ledger-row wide">
           <span class="ledger-month">${monthLong(r.mois)}</span>
           <a class="ledger-client" href="#/client/${r.client_id}">${esc(r.societe)}</a>
-          <span class="ledger-label">${esc(r.libelle) || '<span class="muted">—</span>'}${r.auteur ? `<small> · ${esc(r.auteur)}</small>` : ''}</span>
-          <span class="ledger-amount">${fmtEUR(r.montant, 2)}</span>
+          <span class="ledger-label">${r.numero_facture ? `<span class="mono">${esc(r.numero_facture)}</span> · ` : ''}${esc(r.libelle) || (r.numero_facture ? '' : '<span class="muted">—</span>')}${r.nom_site ? `<small> · ${esc(r.nom_site)}</small>` : ''}${r.auteur ? `<small> · ${esc(r.auteur)}</small>` : ''}</span>
+          <span class="ledger-amount">${fmtEUR(r.montant, 2)}<small class="ledger-ttc">${fmtEUR(Number(r.montant) + tvaDe(r.montant), 2)} TTC</small></span>
           ${delBtn(`deleteCaEntry(${r.id})`)}
         </div>`).join('')}
     </div>` : emptyBlock('book', 'Aucune écriture sur cette année');
@@ -1250,6 +1390,7 @@ async function openCaEntryDialog(clientId = null) {
       { name: 'client_id', label: 'Client', type: 'select', value: clientId || '',
         options: clients.map(c => ({ value: c.id, label: c.code_client ? `${c.societe} (${c.code_client})` : c.societe })) },
       { name: 'mois', label: 'Mois', type: 'month', value: `${state.caYear}-${String(state.caYear === new Date().getFullYear() ? new Date().getMonth() + 1 : 12).padStart(2, '0')}` },
+      { name: 'numero_facture', label: 'N° de facture (facultatif)', placeholder: 'FA-2026-001' },
       { name: 'libelle', label: 'Libellé', placeholder: 'Prestation réalisée…' },
       { name: 'montant', label: 'Montant HT (€)', type: 'number', step: '0.01', placeholder: '0,00' },
     ],
@@ -1678,14 +1819,15 @@ function clientPageSkeleton() {
     <div class="skeleton" style="width:80px;height:14px;margin-bottom:18px"></div>
     <div class="card client-hero">
       <div class="hero-main">
-        <div class="skeleton" style="width:72px;height:72px;border-radius:18px"></div>
+        <div class="skeleton" style="width:72px;height:72px;border-radius:10px"></div>
         <div class="hero-id" style="flex:1"><div class="skeleton" style="width:40%;height:26px"></div><div class="skeleton mt12" style="width:25%"></div></div>
       </div>
       <div class="hero-stats">${[1, 2, 3, 4].map(() => '<div class="hero-stat"><div class="skeleton" style="width:60%;height:10px"></div><div class="skeleton mt8" style="width:80%"></div></div>').join('')}</div>
     </div>
-    <div class="client-grid">
-      <div class="client-col"><div class="card"><div class="skeleton skeleton-chart"></div></div></div>
-      <div class="client-col"><div class="card"><div class="skeleton" style="height:160px"></div></div></div>
+    <div class="client-tabs">${CLIENT_TABS.map(() => '<div class="skeleton" style="width:90px;height:14px;margin-bottom:14px"></div>').join('')}</div>
+    <div class="synth-grid">
+      <div class="card"><div class="skeleton" style="height:220px"></div></div>
+      <div class="card"><div class="skeleton" style="height:220px"></div></div>
     </div>`;
 }
 
