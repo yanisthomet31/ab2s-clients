@@ -170,6 +170,14 @@ function updateThemeButton() {
   document.getElementById('theme-toggle').title = dark ? 'Mode clair' : 'Mode sombre';
 }
 
+// ─── CHAMPS NUMÉRIQUES : la molette ne modifie pas le montant ───
+// Dans Chrome, faire défiler la page avec la molette pendant qu'un champ numérique
+// est actif change sa valeur d'un cran (0,01 €). On retire le focus pour l'éviter.
+document.addEventListener('wheel', e => {
+  const el = e.target;
+  if (el instanceof HTMLInputElement && el.type === 'number' && document.activeElement === el) el.blur();
+}, { passive: true });
+
 // ─── MENU DU COMPTE (barre du haut) ───────────────────
 function toggleUserMenu(e) {
   e.stopPropagation();
