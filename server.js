@@ -9,7 +9,7 @@ const { Pool } = require('pg');
 
 const app = express();
 const PORT = process.env.PORT || 3739;
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
 
 app.set('trust proxy', 1); // Render (et tout proxy inverse) termine le HTTPS en amont — sans ça, cookie.secure ne voit jamais la requête comme sécurisée et le cookie de session n'est jamais envoyé.
 app.use(cors());
@@ -147,6 +147,8 @@ async function initDB() {
     );
     CREATE INDEX IF NOT EXISTS client_ca_mois_idx ON client_ca (mois);
     CREATE INDEX IF NOT EXISTS client_ca_client_idx ON client_ca (client_id);
+    ALTER TABLE client_ca ADD COLUMN IF NOT EXISTS numero_facture TEXT;
+    ALTER TABLE client_ca ADD COLUMN IF NOT EXISTS site_id INTEGER REFERENCES client_sites(id) ON DELETE SET NULL;
     -- Migration ponctuelle : le compte avait été créé avec la faute de frappe "adber" au lieu de "abder"
     -- (doit s'exécuter AVANT l'INSERT ci-dessous pour éviter un conflit d'unicité sur 'abder')
     UPDATE users SET username='abder', nom='Abder', password_hash='$2b$10$YQ7ACExz9USL9asJRXM9VuYWb9JVue4UGv5IvCCxV1l2sA3LVlxLK' WHERE username='adber';
@@ -287,8 +289,10 @@ app.get('/api/clients/:id', async (req, res) => {
     query('SELECT * FROM client_historique WHERE client_id=$1 ORDER BY date DESC', [id]),
     query('SELECT * FROM client_contacts WHERE client_id=$1 ORDER BY created_at', [id]),
     query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee, qualification NULLS FIRST', [id]),
-    query(`SELECT id, client_id, to_char(mois, 'YYYY-MM') AS mois, libelle, montant, auteur, created_at
-           FROM client_ca WHERE client_id=$1 ORDER BY mois DESC, id DESC`, [id])
+    query(`SELECT ca.id, ca.client_id, to_char(ca.mois, 'YYYY-MM') AS mois, ca.libelle, ca.montant, ca.auteur, ca.created_at,
+                  ca.numero_facture, ca.site_id, s.nom_site
+           FROM client_ca ca LEFT JOIN client_sites s ON s.id = ca.site_id
+           WHERE ca.client_id=$1 ORDER BY ca.mois DESC, ca.id DESC`, [id])
   ]);
   if (!clientR.rows[0]) return res.status(404).json({ error: 'Introuvable' });
 
@@ -494,13 +498,19 @@ app.delete('/api/historique/:id', async (req, res) => {
 const MOIS_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 app.post('/api/clients/:clientId/ca', async (req, res) => {
-  const { mois, libelle, montant } = req.body;
+  const { mois, libelle, montant, numero_facture } = req.body;
   const m = parseFloat(montant);
   if (!MOIS_RE.test(mois || '')) return res.status(400).json({ error: 'Mois invalide' });
   if (!Number.isFinite(m)) return res.status(400).json({ error: 'Montant invalide' });
+  // Site facultatif : il doit appartenir à ce client
+  let siteId = parseInt(req.body.site_id) || null;
+  if (siteId) {
+    const s = await query('SELECT 1 FROM client_sites WHERE id=$1 AND client_id=$2', [siteId, req.params.clientId]);
+    if (!s.rowCount) return res.status(400).json({ error: 'Site inconnu pour ce client' });
+  }
   const { rows } = await query(
-    'INSERT INTO client_ca (client_id, mois, libelle, montant, auteur) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-    [req.params.clientId, `${mois}-01`, libelle || null, m, req.session.nom]);
+    'INSERT INTO client_ca (client_id, mois, libelle, montant, auteur, numero_facture, site_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+    [req.params.clientId, `${mois}-01`, libelle || null, m, req.session.nom, (numero_facture || '').trim() || null, siteId]);
   res.json({ id: rows[0].id });
 });
 
@@ -513,8 +523,10 @@ app.get('/api/ca', async (req, res) => {
   const annee = parseInt(req.query.annee) || new Date().getFullYear();
   const { rows } = await query(
     `SELECT ca.id, ca.client_id, c.societe, c.code_client, c.logo_mime_type,
-            to_char(ca.mois, 'YYYY-MM') AS mois, ca.libelle, ca.montant, ca.auteur, ca.created_at
+            to_char(ca.mois, 'YYYY-MM') AS mois, ca.libelle, ca.montant, ca.auteur, ca.created_at,
+            ca.numero_facture, s.nom_site
      FROM client_ca ca JOIN clients c ON c.id = ca.client_id
+     LEFT JOIN client_sites s ON s.id = ca.site_id
      WHERE EXTRACT(YEAR FROM ca.mois) = $1
      ORDER BY ca.mois DESC, ca.id DESC`, [annee]);
   res.json(rows);
@@ -523,14 +535,20 @@ app.get('/api/ca', async (req, res) => {
 app.get('/api/ca/export', async (req, res) => {
   const annee = parseInt(req.query.annee) || new Date().getFullYear();
   const { rows } = await query(
-    `SELECT to_char(ca.mois, 'YYYY-MM') AS mois, c.code_client, c.societe, ca.libelle, ca.montant, ca.auteur
+    `SELECT to_char(ca.mois, 'YYYY-MM') AS mois, c.code_client, c.societe, ca.numero_facture, s.nom_site,
+            ca.libelle, ca.montant, ca.auteur
      FROM client_ca ca JOIN clients c ON c.id = ca.client_id
+     LEFT JOIN client_sites s ON s.id = ca.site_id
      WHERE EXTRACT(YEAR FROM ca.mois) = $1 ORDER BY ca.mois, c.societe`, [annee]);
   const cell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+  const num = v => (Math.round(v * 100) / 100).toFixed(2).replace('.', ',');
   const csv = [
-    ['Mois', 'Code client', 'Société', 'Libellé', 'Montant HT', 'Saisi par'].join(';'),
-    ...rows.map(r => [r.mois, cell(r.code_client), cell(r.societe), cell(r.libelle),
-      String(r.montant).replace('.', ','), cell(r.auteur)].join(';'))
+    ['Mois', 'Code client', 'Société', 'N° facture', 'Site', 'Libellé', 'Montant HT', 'TVA 20 %', 'Montant TTC', 'Saisi par'].join(';'),
+    ...rows.map(r => {
+      const ht = Number(r.montant), tva = Math.round(ht * 20) / 100;
+      return [r.mois, cell(r.code_client), cell(r.societe), cell(r.numero_facture), cell(r.nom_site), cell(r.libelle),
+        num(ht), num(tva), num(ht + tva), cell(r.auteur)].join(';');
+    })
   ].join('\n');
   res.setHeader('Content-Type', 'text/csv;charset=utf-8');
   res.setHeader('Content-Disposition', `attachment;filename="grand_livre_${annee}.csv"`);
@@ -608,6 +626,12 @@ app.get('/api/export/csv', async (req, res) => {
   res.setHeader('Content-Type', 'text/csv;charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment;filename="clients_ab2s.csv"');
   res.send('﻿' + csv);
+});
+
+// Fichier trop lourd (limite de 20 Mo) : réponse lisible par l'interface
+app.use((err, req, res, next) => {
+  if (err && err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Fichier trop volumineux (20 Mo maximum)' });
+  next(err);
 });
 
 // ─── Démarrage ──────────────────────────────────────────
