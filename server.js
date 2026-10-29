@@ -149,6 +149,9 @@ async function initDB() {
     CREATE INDEX IF NOT EXISTS client_ca_client_idx ON client_ca (client_id);
     ALTER TABLE client_ca ADD COLUMN IF NOT EXISTS numero_facture TEXT;
     ALTER TABLE client_ca ADD COLUMN IF NOT EXISTS site_id INTEGER REFERENCES client_sites(id) ON DELETE SET NULL;
+    -- TVA et TTC saisis à la main (NULL = calcul automatique à 20 %)
+    ALTER TABLE client_ca ADD COLUMN IF NOT EXISTS tva NUMERIC;
+    ALTER TABLE client_ca ADD COLUMN IF NOT EXISTS ttc NUMERIC;
     -- Migration ponctuelle : le compte avait été créé avec la faute de frappe "adber" au lieu de "abder"
     -- (doit s'exécuter AVANT l'INSERT ci-dessous pour éviter un conflit d'unicité sur 'abder')
     UPDATE users SET username='abder', nom='Abder', password_hash='$2b$10$YQ7ACExz9USL9asJRXM9VuYWb9JVue4UGv5IvCCxV1l2sA3LVlxLK' WHERE username='adber';
@@ -290,7 +293,7 @@ app.get('/api/clients/:id', async (req, res) => {
     query('SELECT * FROM client_contacts WHERE client_id=$1 ORDER BY created_at', [id]),
     query('SELECT * FROM client_tarifs WHERE client_id=$1 ORDER BY annee, qualification NULLS FIRST', [id]),
     query(`SELECT ca.id, ca.client_id, to_char(ca.mois, 'YYYY-MM') AS mois, ca.libelle, ca.montant, ca.auteur, ca.created_at,
-                  ca.numero_facture, ca.site_id, s.nom_site
+                  ca.numero_facture, ca.site_id, s.nom_site, ca.tva, ca.ttc
            FROM client_ca ca LEFT JOIN client_sites s ON s.id = ca.site_id
            WHERE ca.client_id=$1 ORDER BY ca.mois DESC, ca.id DESC`, [id])
   ]);
@@ -497,21 +500,54 @@ app.delete('/api/historique/:id', async (req, res) => {
 // ─── Chiffre d'affaires (grand livre) ───────────────────
 const MOIS_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
-app.post('/api/clients/:clientId/ca', async (req, res) => {
-  const { mois, libelle, montant, numero_facture } = req.body;
+// Montant facultatif : vide = NULL (calcul automatique), sinon un nombre valide
+function montantFacultatif(v) {
+  if (v === undefined || v === null || String(v).trim() === '') return { ok: true, value: null };
+  const n = parseFloat(String(v).replace(',', '.'));
+  return Number.isFinite(n) ? { ok: true, value: n } : { ok: false };
+}
+
+// Vérifie et prépare une écriture (création ou modification)
+async function lireEcriture(body, clientId) {
+  const { mois, libelle, montant, numero_facture } = body;
   const m = parseFloat(montant);
-  if (!MOIS_RE.test(mois || '')) return res.status(400).json({ error: 'Mois invalide' });
-  if (!Number.isFinite(m)) return res.status(400).json({ error: 'Montant invalide' });
+  if (!MOIS_RE.test(mois || '')) return { error: 'Mois invalide' };
+  if (!Number.isFinite(m)) return { error: 'Montant invalide' };
+  const tva = montantFacultatif(body.tva), ttc = montantFacultatif(body.ttc);
+  if (!tva.ok) return { error: 'Montant de TVA invalide' };
+  if (!ttc.ok) return { error: 'Montant TTC invalide' };
   // Site facultatif : il doit appartenir à ce client
-  let siteId = parseInt(req.body.site_id) || null;
+  const siteId = parseInt(body.site_id) || null;
   if (siteId) {
-    const s = await query('SELECT 1 FROM client_sites WHERE id=$1 AND client_id=$2', [siteId, req.params.clientId]);
-    if (!s.rowCount) return res.status(400).json({ error: 'Site inconnu pour ce client' });
+    const s = await query('SELECT 1 FROM client_sites WHERE id=$1 AND client_id=$2', [siteId, clientId]);
+    if (!s.rowCount) return { error: 'Site inconnu pour ce client' };
   }
+  return { mois: `${mois}-01`, libelle: libelle || null, montant: m, numero_facture: (numero_facture || '').trim() || null,
+           site_id: siteId, tva: tva.value, ttc: ttc.value };
+}
+
+app.post('/api/clients/:clientId/ca', async (req, res) => {
+  const e = await lireEcriture(req.body, req.params.clientId);
+  if (e.error) return res.status(400).json({ error: e.error });
   const { rows } = await query(
-    'INSERT INTO client_ca (client_id, mois, libelle, montant, auteur, numero_facture, site_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
-    [req.params.clientId, `${mois}-01`, libelle || null, m, req.session.nom, (numero_facture || '').trim() || null, siteId]);
+    `INSERT INTO client_ca (client_id, mois, libelle, montant, auteur, numero_facture, site_id, tva, ttc)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+    [req.params.clientId, e.mois, e.libelle, e.montant, req.session.nom, e.numero_facture, e.site_id, e.tva, e.ttc]);
   res.json({ id: rows[0].id });
+});
+
+app.put('/api/ca/:id', async (req, res) => {
+  const cur = await query('SELECT client_id, site_id FROM client_ca WHERE id=$1', [req.params.id]);
+  if (!cur.rowCount) return res.status(404).json({ error: 'Écriture introuvable' });
+  const { client_id } = cur.rows[0];
+  // Sans champ « site » (grand livre général), le site enregistré est conservé
+  const body = 'site_id' in req.body ? req.body : { ...req.body, site_id: cur.rows[0].site_id };
+  const e = await lireEcriture(body, client_id);
+  if (e.error) return res.status(400).json({ error: e.error });
+  await query(
+    `UPDATE client_ca SET mois=$1, libelle=$2, montant=$3, numero_facture=$4, site_id=$5, tva=$6, ttc=$7 WHERE id=$8`,
+    [e.mois, e.libelle, e.montant, e.numero_facture, e.site_id, e.tva, e.ttc, req.params.id]);
+  res.json({ ok: true });
 });
 
 app.delete('/api/ca/:id', async (req, res) => {
@@ -524,7 +560,7 @@ app.get('/api/ca', async (req, res) => {
   const { rows } = await query(
     `SELECT ca.id, ca.client_id, c.societe, c.code_client, c.logo_mime_type,
             to_char(ca.mois, 'YYYY-MM') AS mois, ca.libelle, ca.montant, ca.auteur, ca.created_at,
-            ca.numero_facture, s.nom_site
+            ca.numero_facture, ca.site_id, s.nom_site, ca.tva, ca.ttc
      FROM client_ca ca JOIN clients c ON c.id = ca.client_id
      LEFT JOIN client_sites s ON s.id = ca.site_id
      WHERE EXTRACT(YEAR FROM ca.mois) = $1
@@ -536,7 +572,7 @@ app.get('/api/ca/export', async (req, res) => {
   const annee = parseInt(req.query.annee) || new Date().getFullYear();
   const { rows } = await query(
     `SELECT to_char(ca.mois, 'YYYY-MM') AS mois, c.code_client, c.societe, ca.numero_facture, s.nom_site,
-            ca.libelle, ca.montant, ca.auteur
+            ca.libelle, ca.montant, ca.tva, ca.ttc, ca.auteur
      FROM client_ca ca JOIN clients c ON c.id = ca.client_id
      LEFT JOIN client_sites s ON s.id = ca.site_id
      WHERE EXTRACT(YEAR FROM ca.mois) = $1 ORDER BY ca.mois, c.societe`, [annee]);
@@ -545,9 +581,11 @@ app.get('/api/ca/export', async (req, res) => {
   const csv = [
     ['Mois', 'Code client', 'Société', 'N° facture', 'Site', 'Libellé', 'Montant HT', 'TVA 20 %', 'Montant TTC', 'Saisi par'].join(';'),
     ...rows.map(r => {
-      const ht = Number(r.montant), tva = Math.round(ht * 20) / 100;
+      const ht = Number(r.montant);
+      const tva = r.tva !== null ? Number(r.tva) : Math.round(ht * 20) / 100;
+      const ttc = r.ttc !== null ? Number(r.ttc) : ht + tva;
       return [r.mois, cell(r.code_client), cell(r.societe), cell(r.numero_facture), cell(r.nom_site), cell(r.libelle),
-        num(ht), num(tva), num(ht + tva), cell(r.auteur)].join(';');
+        num(ht), num(tva), num(ttc), cell(r.auteur)].join(';');
     })
   ].join('\n');
   res.setHeader('Content-Type', 'text/csv;charset=utf-8');

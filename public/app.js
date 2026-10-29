@@ -554,7 +554,8 @@ function clientPageLayout() {
             <div class="form-group" id="ca-site-group"></div>
             <div class="form-group grow"><label>Libellé</label><input type="text" name="libelle" placeholder="Prestation réalisée…"></div>
             <div class="form-group"><label>Montant HT (€)</label><input type="number" name="montant" step="0.01" placeholder="0,00" style="width:140px" required></div>
-            <div class="tva-preview" id="tva-preview"><span>TVA 20 % <b>—</b></span><span>TTC <b>—</b></span></div>
+            <div class="form-group"><label>TVA (€) <span class="muted">auto 20 %</span></label><input type="number" name="tva" step="0.01" placeholder="—" style="width:120px" title="Laisser vide pour le calcul automatique à 20 %"></div>
+            <div class="form-group"><label>TTC (€) <span class="muted">auto</span></label><input type="number" name="ttc" step="0.01" placeholder="—" style="width:130px" title="Laisser vide pour le calcul automatique (HT + TVA)"></div>
             <button class="btn-primary" type="submit">${ic('plus')}Ajouter</button>
           </form>` })}
     </section>
@@ -791,6 +792,11 @@ function renderInfos(c) {
 // ─── Chiffre d'affaires du client ─────────────────────
 const TAUX_TVA = 0.20;
 const tvaDe = ht => Math.round(Number(ht) * TAUX_TVA * 100) / 100;
+const estSaisi = v => v !== null && v !== undefined && v !== '';
+// TVA et TTC d'une écriture : montant saisi à la main s'il existe, sinon calcul automatique
+const tvaLigne = e => estSaisi(e.tva) ? Number(e.tva) : tvaDe(e.montant);
+const ttcLigne = e => estSaisi(e.ttc) ? Number(e.ttc) : Number(e.montant) + tvaLigne(e);
+const manuel = e => estSaisi(e.tva) || estSaisi(e.ttc);
 
 function renderClientCa() {
   const c = state.client;
@@ -823,8 +829,8 @@ function renderClientCa() {
 
   const lignes = annee === 'tous' ? rows : rows.filter(e => e.mois.startsWith(annee));
   const somme = list => list.reduce((s, e) => s + Number(e.montant), 0);
-  const ht = somme(lignes), tva = lignes.reduce((s, e) => s + tvaDe(e.montant), 0);
-  const totalHT = somme(rows), totalTVA = rows.reduce((s, e) => s + tvaDe(e.montant), 0);
+  const ht = somme(lignes), tva = lignes.reduce((s, e) => s + tvaLigne(e), 0), ttc = lignes.reduce((s, e) => s + ttcLigne(e), 0);
+  const totalHT = somme(rows), totalTTC = rows.reduce((s, e) => s + ttcLigne(e), 0);
   const premier = rows.map(e => e.mois).sort()[0];
   const libAnnee = annee === 'tous' ? 'toutes années' : annee;
   const avecSite = sites.length > 0 || lignes.some(e => e.nom_site);
@@ -833,9 +839,9 @@ function renderClientCa() {
     <div class="ca-stats">
       <div><span class="hs-label">Total HT · ${libAnnee}</span><span class="ca-stat-value">${fmtEUR(ht, 2)}</span></div>
       <div><span class="hs-label">TVA 20 %</span><span class="ca-stat-value">${fmtEUR(tva, 2)}</span></div>
-      <div><span class="hs-label">Total TTC · ${libAnnee}</span><span class="ca-stat-value">${fmtEUR(ht + tva, 2)}</span></div>
+      <div><span class="hs-label">Total TTC · ${libAnnee}</span><span class="ca-stat-value">${fmtEUR(ttc, 2)}</span></div>
       <div class="ca-stat-since"><span class="hs-label">Depuis le début</span><span class="ca-stat-value">${fmtEUR(totalHT, 2)} <small>HT</small></span>
-        <span class="ca-stat-sub">${fmtEUR(totalHT + totalTVA, 2)} TTC · depuis ${monthLong(premier).toLowerCase()}</span></div>
+        <span class="ca-stat-sub">${fmtEUR(totalTTC, 2)} TTC · depuis ${monthLong(premier).toLowerCase()}</span></div>
     </div>
     <div id="chart-client-ca" class="chart chart-sm"></div>
     ${lignes.length ? `
@@ -846,21 +852,21 @@ function renderClientCa() {
           <th class="r">HT</th><th class="r">TVA 20 %</th><th class="r">TTC</th><th></th>
         </tr></thead>
         <tbody>${lignes.map(e => {
-          const t = tvaDe(e.montant);
+          const flag = manuel(e) ? `<span class="manual-flag" title="TVA / TTC saisis à la main">${ic('edit')}</span>` : '';
           return `<tr>
             <td class="nowrap">${monthLong(e.mois)}</td>
             <td>${e.numero_facture ? `<span class="mono">${esc(e.numero_facture)}</span>` : '<span class="muted">—</span>'}</td>
             ${avecSite ? `<td>${e.nom_site ? esc(e.nom_site) : '<span class="muted">—</span>'}</td>` : ''}
             <td>${esc(e.libelle) || '<span class="muted">—</span>'}${e.auteur ? `<small class="muted"> · ${esc(e.auteur)}</small>` : ''}</td>
             <td class="r num strong">${fmtEUR(e.montant, 2)}</td>
-            <td class="r num muted">${fmtEUR(t, 2)}</td>
-            <td class="r num">${fmtEUR(Number(e.montant) + t, 2)}</td>
-            <td class="r">${delBtn(`deleteCaEntry(${e.id})`)}</td>
+            <td class="r num muted">${estSaisi(e.tva) ? flag : ''}${fmtEUR(tvaLigne(e), 2)}</td>
+            <td class="r num">${estSaisi(e.ttc) && !estSaisi(e.tva) ? flag : ''}${fmtEUR(ttcLigne(e), 2)}</td>
+            <td class="r"><span class="row-actions">${editBtn(`editCaEntry(${e.id})`)}${delBtn(`deleteCaEntry(${e.id})`)}</span></td>
           </tr>`;
         }).join('')}</tbody>
         <tfoot><tr>
           <td colspan="${avecSite ? 4 : 3}">Total ${libAnnee}</td>
-          <td class="r num">${fmtEUR(ht, 2)}</td><td class="r num">${fmtEUR(tva, 2)}</td><td class="r num">${fmtEUR(ht + tva, 2)}</td><td><span></span></td>
+          <td class="r num">${fmtEUR(ht, 2)}</td><td class="r num">${fmtEUR(tva, 2)}</td><td class="r num">${fmtEUR(ttc, 2)}</td><td><span></span></td>
         </tr></tfoot>
       </table>
     </div>` : emptyBlock('trend', `Aucun montant saisi en ${annee}`)}`;
@@ -885,11 +891,16 @@ function renderClientCaChart() {
   barChart(el, data, { height: 170, format: v => `${fmtEUR(v, 2)} HT`, axisFormat: v => fmtEURCompact(v), empty: 'Aucun montant sur cette période' });
 }
 
+// Les champs TVA et TTC restent vides (= calcul automatique) : on affiche
+// la valeur calculée en grisé. Les remplir permet de forcer un autre montant.
 function updateTvaPreview(form) {
-  const ht = parseFloat(form.querySelector('[name=montant]').value);
-  const [tvaEl, ttcEl] = document.querySelectorAll('#tva-preview b');
-  tvaEl.textContent = Number.isFinite(ht) ? fmtEUR(tvaDe(ht), 2) : '—';
-  ttcEl.textContent = Number.isFinite(ht) ? fmtEUR(ht + tvaDe(ht), 2) : '—';
+  const champ = n => form.querySelector(`[name=${n}]`);
+  const ht = parseFloat(champ('montant').value);
+  const tvaSaisie = parseFloat(champ('tva').value);
+  const tva = Number.isFinite(tvaSaisie) ? tvaSaisie : Number.isFinite(ht) ? tvaDe(ht) : NaN;
+  const nombre = v => v.toFixed(2);
+  champ('tva').placeholder = Number.isFinite(ht) ? nombre(tvaDe(ht)) : '—';
+  champ('ttc').placeholder = Number.isFinite(ht) && Number.isFinite(tva) ? nombre(ht + tva) : '—';
 }
 
 async function addCaEntry(e) {
@@ -898,12 +909,48 @@ async function addCaEntry(e) {
   if (!f.montant) return toast('Indiquez un montant', true);
   const r = await api(`/api/clients/${state.clientId}/ca`, { method: 'POST', body: f });
   if (!r || r.error) return toast((r && r.error) || 'Erreur', true);
-  ['libelle', 'montant', 'numero_facture'].forEach(n => { e.target.querySelector(`[name=${n}]`).value = ''; });
+  ['libelle', 'montant', 'numero_facture', 'tva', 'ttc'].forEach(n => { e.target.querySelector(`[name=${n}]`).value = ''; });
   updateTvaPreview(e.target);
   e.target.querySelector('[name=numero_facture]').focus();
   state.clientCaYear = f.mois.slice(0, 4);
   toast(`${fmtEUR(f.montant, 2)} HT ajoutés pour ${monthLong(f.mois).toLowerCase()}`);
   refreshClient();
+}
+
+async function editCaEntry(id) {
+  const surFiche = state.page === 'client' && state.client;
+  const e = (surFiche ? state.client.ca : state.caRows || []).find(x => x.id === id);
+  if (!e) return;
+  const sites = surFiche ? (state.client.sites || []) : [];
+  const nombre = v => estSaisi(v) ? Number(v).toFixed(2) : '';
+  const values = await uiDialog({
+    title: 'Modifier l\'écriture',
+    message: 'Laissez TVA et TTC vides pour le calcul automatique (TVA 20 %, TTC = HT + TVA).',
+    icon: 'edit',
+    okText: 'Enregistrer',
+    fields: [
+      { name: 'mois', label: 'Mois', type: 'month', value: e.mois },
+      { name: 'numero_facture', label: 'N° de facture', value: e.numero_facture || '', placeholder: 'FA-2026-001' },
+      ...(sites.length ? [{ name: 'site_id', label: 'Site (facultatif)', type: 'select', value: e.site_id || '',
+        options: [{ value: '', label: 'Tous / non précisé' }, ...sites.map(x => ({ value: x.id, label: x.code_site ? `${x.nom_site} (${x.code_site})` : x.nom_site }))] }] : []),
+      { name: 'libelle', label: 'Libellé', value: e.libelle || '', placeholder: 'Prestation réalisée…' },
+      { name: 'montant', label: 'Montant HT (€)', type: 'number', step: '0.01', value: nombre(e.montant) },
+      { name: 'tva', label: 'TVA (€) — vide = 20 % automatique', type: 'number', step: '0.01', value: nombre(e.tva) },
+      { name: 'ttc', label: 'TTC (€) — vide = HT + TVA', type: 'number', step: '0.01', value: nombre(e.ttc) },
+    ],
+    onInput: updateTvaPreview,
+    validate: async v => {
+      if (!v.mois) return 'Choisissez un mois';
+      if (!v.montant || isNaN(parseFloat(v.montant))) return 'Indiquez un montant HT';
+      const r = await api(`/api/ca/${id}`, { method: 'PUT', body: v });
+      if (!r || r.error) return (r && r.error) || 'Erreur';
+      return null;
+    }
+  });
+  if (!values) return;
+  toast('Écriture modifiée');
+  if (state.page === 'client') { state.clientCaYear = values.mois.slice(0, 4); refreshClient(); }
+  if (state.page === 'ca') loadCa();
 }
 
 function deleteCaEntry(id) {
@@ -1380,8 +1427,8 @@ function renderCa() {
           <span class="ledger-month">${monthLong(r.mois)}</span>
           <a class="ledger-client" href="#/client/${r.client_id}">${esc(r.societe)}</a>
           <span class="ledger-label">${r.numero_facture ? `<span class="mono">${esc(r.numero_facture)}</span> · ` : ''}${esc(r.libelle) || (r.numero_facture ? '' : '<span class="muted">—</span>')}${r.nom_site ? `<small> · ${esc(r.nom_site)}</small>` : ''}${r.auteur ? `<small> · ${esc(r.auteur)}</small>` : ''}</span>
-          <span class="ledger-amount">${fmtEUR(r.montant, 2)}<small class="ledger-ttc">${fmtEUR(Number(r.montant) + tvaDe(r.montant), 2)} TTC</small></span>
-          ${delBtn(`deleteCaEntry(${r.id})`)}
+          <span class="ledger-amount">${fmtEUR(r.montant, 2)}<small class="ledger-ttc">${fmtEUR(ttcLigne(r), 2)} TTC${manuel(r) ? ' · manuel' : ''}</small></span>
+          <span class="row-actions">${editBtn(`editCaEntry(${r.id})`)}${delBtn(`deleteCaEntry(${r.id})`)}</span>
         </div>`).join('')}
     </div>` : emptyBlock('book', 'Aucune écriture sur cette année');
 }
@@ -1705,6 +1752,8 @@ function uiDialog(opts) {
     return `<div class="form-group"><label for="dlg-${f.name}">${esc(f.label)}</label>${input}</div>`;
   }).join('') + '<button type="submit" hidden></button>';
   form.style.display = opts.fields && opts.fields.length ? '' : 'none';
+  form.oninput = opts.onInput ? () => opts.onInput(form) : null;
+  if (opts.onInput) opts.onInput(form);
 
   document.getElementById('dialog-overlay').classList.add('open');
   setTimeout(() => (form.querySelector('input, select') || ok).focus(), 50);
@@ -1799,6 +1848,10 @@ function ic(name, cls = 'i-sm') {
 }
 
 function dash() { return '<span class="muted">—</span>'; }
+
+function editBtn(onclick) {
+  return `<button type="button" class="activite-del row-edit" onclick="event.stopPropagation(); ${onclick}" title="Modifier">${ic('edit')}</button>`;
+}
 
 function delBtn(onclick) {
   return `<button type="button" class="activite-del" onclick="event.stopPropagation(); ${onclick}" title="Supprimer">${ic('trash')}</button>`;
